@@ -1,12 +1,13 @@
-from python_speech_features import mfcc
 import scipy.io.wavfile as wav
 import numpy as np
+from python_speech_features import mfcc
 
-class FeaturesMFCC(object):
+
+class FeaturesMFCC:
     """
     Class containing MFCC variables and methods to extract features from wav file
     """
-    def __init__(self, winlengthSec = 0.02, winStepSec = 0.01, numFeatures = 20):
+    def __init__(self, winlengthSec=0.02, winStepSec=0.01, numFeatures=20):
         """
         Args:
             winLengthSec (float): Window length for FTT
@@ -21,7 +22,7 @@ class FeaturesMFCC(object):
         #assert os.path.exists(filePath)
         (samplerate, signal) = wav.read(filePath)
         #normalize along first column in array of Nx1
-        signal /= np.max(signal,axis=0)
+        signal /= np.max(signal, axis=0)
         features = mfcc(signal, samplerate, self.winLengthSec, self.winStepSec, self.numFeatures)
         return features
 
