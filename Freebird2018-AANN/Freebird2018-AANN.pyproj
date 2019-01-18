@@ -11,6 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>Freebird2018-AANN</Name>
     <RootNamespace>Freebird2018-AANN</RootNamespace>
+    <InterpreterId>CondaEnv|CondaEnv|conda_pytorch</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -21,7 +22,41 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Features.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Freebird2018DataSet.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Freebird2018_AANN.py" />
+    <Compile Include="gettingtoknow.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="python_speech_features\base.py" />
+    <Compile Include="python_speech_features\sigproc.py" />
+    <Compile Include="python_speech_features\__init__.py" />
+    <Compile Include="Tests\placeholderTest.py">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|conda_pytorch" />
+    <InterpreterReference Include="Global|ContinuumAnalytics|Anaconda36-64" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="env\">
+      <Id>env</Id>
+      <Version>3.6</Version>
+      <Description>env (Anaconda 5.2.0)</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tests\" />
+    <Folder Include="python_speech_features\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
