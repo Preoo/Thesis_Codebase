@@ -116,7 +116,7 @@ def main():
     for label in fb_dataset.labels:
         aann_classifier.add_new_model(AANN(), label)
     for epoch in range(args.epochs):
-        print("Training loop for epoch %d", epoch)
+        print("Training loop for epoch &d", epoch)
         aann_classifier.training_loop(train_loader)
 
     print("Evaluation loop")

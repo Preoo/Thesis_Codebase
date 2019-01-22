@@ -25,6 +25,7 @@ class Freebird2018DataSet(Dataset):
         print("__getitem__")
         raw_features = self.feature_extractor.get_features(self.get_recording(index, self.dir))
         features_list = self.split_to_list(raw_features, 10)
+        #print(features_list[0:1])
         return features_list, self.labels[index]
 
     def parse_csv(self, data_dir):
