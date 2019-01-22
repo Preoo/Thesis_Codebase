@@ -8,7 +8,7 @@ from Freebird2018DataSet import Freebird2018DataSet
 from Features import FeaturesMFCC
 
 parser = argparse.ArgumentParser(description='FreeBird2018_AANN_exp')
-parser.add_argument('--batch-size', type=int, default=4, help='Input batch size, default 4')
+parser.add_argument('--batch-size', type=int, default=1, help='Input batch size, default 4')
 parser.add_argument('--epochs', type=int, default=3, metavar='N', help='Number of epoch to train')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Use cpu as device instead of CUDA')
 parser.add_argument('--file-dir', default='F:\\Downloads\\ff1010bird_wav', help='Directory of metadata and ./wav folder')
@@ -68,13 +68,15 @@ class AANN_Classifer():
         for label, model in self.classifiers.items():
             model.train()
         
-        for batch, (input, label) in enumerate(trainingDataLoader):
+        for batch, dataset in enumerate(trainingDataLoader):
 
-            #for input, label in dataset:
+            #for (input, label) in dataset:
+            label = dataset[1][0]
+
             model = self.classifiers[label]
             optimizer = optim.SGD(model.parameters(), lr=1e-4)
             model.to(device)
-            for elem in input:
+            for elem in dataset[0]:
                 predicted = model(elem)
 
                 loss = self.loss_function(elem, predicted)
@@ -108,11 +110,17 @@ class AANN_Classifer():
 
 
 aann_classifier = AANN_Classifer()
-for label in fb_dataset.labels:
-    aann_classifier.add_new_model(AANN(), label)
-for epoch in range(args.epochs):
-    print("Training loop for epoch #%d", epoch)
-    aann_classifier.training_loop(train_loader)
 
-print("Evaluation loop")
-aann_classifier.eval_loop(eval_loader)
+def main():
+    print("main?")
+    for label in fb_dataset.labels:
+        aann_classifier.add_new_model(AANN(), label)
+    for epoch in range(args.epochs):
+        print("Training loop for epoch %d", epoch)
+        aann_classifier.training_loop(train_loader)
+
+    print("Evaluation loop")
+    aann_classifier.eval_loop(eval_loader)
+
+if __name__ == "__main__":
+    main()

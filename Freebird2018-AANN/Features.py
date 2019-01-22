@@ -22,9 +22,9 @@ class FeaturesMFCC:
         #assert os.path.exists(filePath)
         (samplerate, signal) = wav.read(filePath)
         #normalize along first column in array of Nx1
-        signal /= np.max(signal, axis=0)
+        norm_signal = signal / np.max(signal, axis=0)
         #features shape is NumFrames x Numpcep, each row per featurevector (numframes)
-        features = mfcc(signal, samplerate, self.winLengthSec, self.winStepSec, self.numFeatures)
+        features = mfcc(norm_signal, samplerate, self.winLengthSec, self.winStepSec, self.numFeatures)
         return features
 
     def segment_signal(self):

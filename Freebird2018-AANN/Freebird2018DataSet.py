@@ -22,6 +22,7 @@ class Freebird2018DataSet(Dataset):
         return len(self.labels)
 
     def __getitem__(self, index):
+        print("__getitem__")
         raw_features = self.feature_extractor.get_features(self.get_recording(index, self.dir))
         features_list = self.split_to_list(raw_features, 10)
         return features_list, self.labels[index]
@@ -52,4 +53,8 @@ class Freebird2018DataSet(Dataset):
     def split_to_list(self, input, n):
         import numpy as np
         #input shape: featureframes x number_of_features, split rows into n chunks
+        #excepts: array split doesn't result in equal division, so we pad with 0s
+        if input.shape[0] % n != 0:
+            y = n - (input.shape[0] % n)
+            input = np.pad(input, [(0,y),(0,0)], mode='constant', constant_values=0)
         return np.vsplit(input, n)
