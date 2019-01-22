@@ -8,26 +8,25 @@ class Freebird2018DataSet(Dataset):
     """
     metadataFile = 'ff1010bird_metadata_2018.csv'
 
-    def __init__(self, data_dir, featureMethod):
+    def __init__(self, data_dir, feature_method):
         """
         Args:
             data_dir (string): Path to root directory with metadata.csv and raw/<audio files> directory
         """
-        self.recordings = None
-        self.labels = None
         self.dir = data_dir
-        self.featureExtractor = featureMethod
-        self.recordings, self.labels = self.parseCSV(self.dir)
+        self.feature_extractor = feature_method
+        self.recordings, self.labels = self.parse_csv(self.dir)
 
     def __len__(self):
         
         return len(self.labels)
 
     def __getitem__(self, index):
-        
-        return self.featureExtractor.getFeatures(self.getRecording(index, self.dir)), self.labels[index]
+        raw_features = self.feature_extractor.get_features(self.get_recording(index, self.dir))
+        features_list = self.split_to_list(raw_features, 10)
+        return features_list, self.labels[index]
 
-    def parseCSV(self, data_dir):
+    def parse_csv(self, data_dir):
         """
         Assumes that csv has shape id,dataset,label without header. Assuming metadata.csv has same entries as there are wav files.
         """
@@ -46,6 +45,11 @@ class Freebird2018DataSet(Dataset):
 
             return ids, labels
 
-    def getRecording(self, index, from_dir):
+    def get_recording(self, index, from_dir):
         """ Retrieves pat hto wav file based on recording id """
         return os.path.join(from_dir,'wav', self.recordings[index] + '.wav')
+
+    def split_to_list(self, input, n):
+        import numpy as np
+        #input shape: featureframes x number_of_features, split rows into n chunks
+        return np.vsplit(input, n)

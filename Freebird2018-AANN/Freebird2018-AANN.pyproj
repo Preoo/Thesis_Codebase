@@ -55,6 +55,7 @@
     </Interpreter>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Checkpoints\" />
     <Folder Include="Tests\" />
     <Folder Include="python_speech_features\" />
   </ItemGroup>

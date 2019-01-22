@@ -18,13 +18,14 @@ class FeaturesMFCC:
         self.winStepSec = winStepSec
         self.numFeatures = numFeatures
 
-    def getFeatures(self, filePath):
+    def get_features(self, filePath):
         #assert os.path.exists(filePath)
         (samplerate, signal) = wav.read(filePath)
         #normalize along first column in array of Nx1
         signal /= np.max(signal, axis=0)
+        #features shape is NumFrames x Numpcep, each row per featurevector (numframes)
         features = mfcc(signal, samplerate, self.winLengthSec, self.winStepSec, self.numFeatures)
         return features
 
-    def segmentSignal(self):
+    def segment_signal(self):
         pass
