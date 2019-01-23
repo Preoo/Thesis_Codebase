@@ -6,8 +6,8 @@ class Freebird2018DataSet(Dataset):
     Creates dataset for Freebird2018
 
     """
-    metadataFile = 'ff1010bird_metadata_2018.csv'
-
+    #metadataFile = 'ff1010bird_metadata_2018.csv'
+    metadataFile = 'debug.csv'
     def __init__(self, data_dir, feature_method):
         """
         Args:
@@ -22,10 +22,11 @@ class Freebird2018DataSet(Dataset):
         return len(self.labels)
 
     def __getitem__(self, index):
-        print("__getitem__")
+        #print("__getitem__")
         raw_features = self.feature_extractor.get_features(self.get_recording(index, self.dir))
         features_list = self.split_to_list(raw_features, 10)
         #print(features_list[0:1])
+        #print("Raw feat_len: %d , List feat_len %d" % (len(raw_features), len(features_list)))
         return features_list, self.labels[index]
 
     def parse_csv(self, data_dir):
@@ -58,4 +59,6 @@ class Freebird2018DataSet(Dataset):
         if input.shape[0] % n != 0:
             y = n - (input.shape[0] % n)
             input = np.pad(input, [(0,y),(0,0)], mode='constant', constant_values=0)
-        return np.vsplit(input, n)
+            #print("vsplit shape: %s" % str(input.shape))
+        #return np.vsplit(input, n)
+        return input
