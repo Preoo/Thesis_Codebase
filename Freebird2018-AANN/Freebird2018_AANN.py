@@ -12,6 +12,7 @@ parser.add_argument('--batch-size', type=int, default=1, help='Input batch size,
 parser.add_argument('--epochs', type=int, default=1, metavar='N', help='Number of epoch to train')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Use cpu as device instead of CUDA')
 parser.add_argument('--file-dir', default='F:\\Downloads\\ff1010bird_wav', help='Directory of metadata and ./wav folder')
+parser.add_argument('--num-features', type=int, default=13, metavar='N', help='Number of MFCC Features')
 args = parser.parse_args()
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -20,8 +21,8 @@ device = "cpu"
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 args.file_dir = args.file_dir or os.path.join('F:\\Downloads\\', 'ff1010bird_wav')
 
-feature_method = FeaturesMFCC()
-
+feature_method = FeaturesMFCC(numFeatures=args.num_features)
+n_feat = args.num_features
 fb_dataset = Freebird2018DataSet(args.file_dir, feature_method)
 
 dataset_len = len(fb_dataset)
@@ -38,14 +39,14 @@ print('Trainset has: ' + str(len(train_set)) + '. Evalset has: ' + str(len(eval_
 
 # Model AANN as a class here
 class AANN(nn.Module):
-    def __init__(self):
+    def __init__(self, num_feat):
         super(AANN, self).__init__()
-
+        self.nfeat = num_feat
         #define layers
-        self.fc_in = nn.Linear(13, 38)
+        self.fc_in = nn.Linear(self.nfeat, 38)
         self.c1 = nn.Linear(38, 4)
         self.fc_e = nn.Linear(4, 38)
-        self.fc_out = nn.Linear(38, 13)
+        self.fc_out = nn.Linear(38, self.nfeat)
 
 
     def encode(self, x):
@@ -58,7 +59,8 @@ class AANN(nn.Module):
 
     #define forward pass with ^ layers, should return output of model
     def forward(self, x):
-        x = x.view(-1, 13)
+        x = x.view(-1, self.nfeat)
+        #print(x.shape)
         x = self.encode(x)
         x = self.decode(x)
         
@@ -75,13 +77,13 @@ class AANN_Classifer():
         
     def add_new_model(self, model, label):
         
-        self.classifiers[label] = (model, optim.Adam(model.parameters(), lr=1e-5))
+        self.classifiers[label] = (model, optim.Adam(model.parameters(), lr=1e-3))
 
     def classify(self, input):
         # should run input over all classifiers and classify it by highest score, 
         # return dict-key (used as label). ex: return '1' if input seems to have bird in it.
         loss_f = self.loss_function
-        predicted_outputs = {label:loss_f(input.view(1,-1,13), model(input).view(1,-1,13)).item() for label, (model, _) in self.classifiers.items()}
+        predicted_outputs = {label:loss_f(input.view(1,-1,args.num_features), model(input).view(1,-1,args.num_features)).item() for label, (model, _) in self.classifiers.items()}
         #predicted_label, _ = max(predicted_outputs, key=lambda x: x[1])
         predicted_label = '0'
         if predicted_outputs['0'] > predicted_outputs['1']:
@@ -105,7 +107,7 @@ class AANN_Classifer():
                 elem = elem.float()
                 predicted = model(elem)
 
-                loss = self.loss_function(elem.view(1,-1,13), predicted.view(1,-1,13))
+                loss = self.loss_function(elem.view(1,-1,args.num_features), predicted.view(1,-1,args.num_features))
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -128,15 +130,17 @@ class AANN_Classifer():
                     predicted_labels.append(self.classify(e))
                 if max(predicted_labels, key=lambda o: predicted_labels.count(o)) == label:
                     correct_labels += 1
-
+                    #print("Correct")
+                #else:
+                #    print("False")
             accuracy = correct_labels / len(evalDataLoader)
             print("Eval accuracy: %f" % accuracy)
 
         
     def loss_function(self, target, predicted):
         #fn = nn.BCELoss()
-        #fn = nn.BCEWithLogitsLoss()
-        fn = nn.MSELoss()
+        fn = nn.BCEWithLogitsLoss()
+        #fn = nn.MSELoss()
         return fn(predicted, target)
 
 
@@ -145,7 +149,7 @@ aann_classifier = AANN_Classifer()
 def main():
     print("main?")
     for label in fb_dataset.labels:
-        aann_classifier.add_new_model(AANN(), label)
+        aann_classifier.add_new_model(AANN(args.num_features), label)
     for epoch in range(args.epochs):
         try:
 

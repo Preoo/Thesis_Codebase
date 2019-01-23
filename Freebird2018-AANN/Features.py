@@ -14,10 +14,11 @@ class FeaturesMFCC:
             winStepSec (float): Window step for FFT
             numFeatures (int): Number of MFCC features to calculate
         """
-        self.winLengthSec = winlengthSec
-        self.winStepSec = winStepSec
-        self.numFeatures = numFeatures
+        self.win_length_sec = winlengthSec
+        self.win_step_sec = winStepSec
+        self.num_features = numFeatures
         self.sample_rate_default = 44100
+
     def get_features(self, filePath):
         try:
             #assert os.path.exists(filePath)
@@ -31,7 +32,7 @@ class FeaturesMFCC:
             print("Incomplete wav chunk in file: %s. Substituting random.." % filePath)
             norm_signal = np.random.uniform(low=0.0, high=1.0, size=(441000,))
             samplerate = self.sample_rate_default
-        features = mfcc(norm_signal, samplerate, self.winLengthSec, self.winStepSec, self.numFeatures)
+        features = mfcc(norm_signal, samplerate, self.win_length_sec, self.win_step_sec, self.num_features)
         #print("Features shape for 10s sample: ")
         #print(features.shape)
         return features
