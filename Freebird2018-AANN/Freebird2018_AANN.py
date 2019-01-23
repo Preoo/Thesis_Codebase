@@ -9,14 +9,14 @@ from Features import FeaturesMFCC
 
 parser = argparse.ArgumentParser(description='FreeBird2018_AANN_exp')
 parser.add_argument('--batch-size', type=int, default=1, help='Input batch size, default 4')
-parser.add_argument('--epochs', type=int, default=1, metavar='N', help='Number of epoch to train')
+parser.add_argument('--epochs', type=int, default=50, metavar='N', help='Number of epoch to train')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Use cpu as device instead of CUDA')
 parser.add_argument('--file-dir', default='F:\\Downloads\\ff1010bird_wav', help='Directory of metadata and ./wav folder')
-parser.add_argument('--num-features', type=int, default=13, metavar='N', help='Number of MFCC Features')
+parser.add_argument('--num-features', type=int, default=8, metavar='N', help='Number of MFCC Features')
 args = parser.parse_args()
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
-#device = torch.device("cuda" if args.cuda else "cpu")
+device = torch.device("cuda" if args.cuda else "cpu")
 device = "cpu"
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 args.file_dir = args.file_dir or os.path.join('F:\\Downloads\\', 'ff1010bird_wav')
@@ -31,9 +31,9 @@ eval_len = dataset_len - train_len
 
 train_set, eval_set = D.random_split(fb_dataset, lengths=[train_len, eval_len])
 
-train_loader = D.DataLoader(train_set, batch_size = args.batch_size, shuffle=True, **kwargs)
+train_loader = D.DataLoader(train_set, batch_size = args.batch_size, **kwargs)
 
-eval_loader = D.DataLoader(eval_set, batch_size = args.batch_size, shuffle=True, **kwargs)
+eval_loader = D.DataLoader(eval_set, batch_size = args.batch_size, **kwargs)
 
 print('Trainset has: ' + str(len(train_set)) + '. Evalset has: ' + str(len(eval_set)))
 
@@ -42,28 +42,38 @@ class AANN(nn.Module):
     def __init__(self, num_feat):
         super(AANN, self).__init__()
         self.nfeat = num_feat
-        #define layers
-        self.fc_in = nn.Linear(self.nfeat, 38)
-        self.c1 = nn.Linear(38, 4)
-        self.fc_e = nn.Linear(4, 38)
-        self.fc_out = nn.Linear(38, self.nfeat)
+        #define layers - input of 8
+        self.encode = nn.Sequential(
+            nn.Linear(self.nfeat, 38),
+            nn.ReLU(True),
+            nn.Linear(38, 4)
+            )
+
+        self.decode = nn.Sequential(
+            nn.Linear(4,38),
+            nn.ReLU(True),
+            nn.Linear(38, self.nfeat),
+            nn.Tanh()
+            )
 
 
-    def encode(self, x):
-        h1 = F.relu(self.fc_in(x))
-        return F.relu(self.c1(h1))
+    #def encode(self, x):
+    #    h1 = F.relu(self.fc_in(x))
+    #    return F.relu(self.c1(h1))
 
-    def decode(self, x):
-        h2 = F.relu(self.fc_e(x))
-        return F.relu(self.fc_out(h2))
+    #def decode(self, x):
+    #    h2 = F.relu(self.fc_e(x))
+    #    return F.relu(self.fc_out(h2))
+        #return F.tanh(self.fc_out(h2))
 
     #define forward pass with ^ layers, should return output of model
     def forward(self, x):
-        x = x.view(-1, self.nfeat)
         #print(x.shape)
+        #x = x.view(-1, self.nfeat)
+        
         x = self.encode(x)
         x = self.decode(x)
-        
+        #x = x.view(1,-1, self.nfeat)
         return x
 
     def init_weights(self):
@@ -76,13 +86,14 @@ class AANN_Classifer():
         self.classifiers = {}
         
     def add_new_model(self, model, label):
-        
-        self.classifiers[label] = (model, optim.Adam(model.parameters(), lr=1e-3))
+        #lr = 1e-3 <- copypaste since autocomplite is ass
+        self.classifiers[label] = (model, optim.Adam(model.parameters()))
 
     def classify(self, input):
         # should run input over all classifiers and classify it by highest score, 
         # return dict-key (used as label). ex: return '1' if input seems to have bird in it.
         loss_f = self.loss_function
+        #predicted_outputs = {label:loss_f(input.view(1,-1,args.num_features), model(input).view(1,-1,args.num_features)).item() for label, (model, _) in self.classifiers.items()}
         predicted_outputs = {label:loss_f(input.view(1,-1,args.num_features), model(input).view(1,-1,args.num_features)).item() for label, (model, _) in self.classifiers.items()}
         #predicted_label, _ = max(predicted_outputs, key=lambda x: x[1])
         predicted_label = '0'
@@ -99,24 +110,29 @@ class AANN_Classifer():
             
             #for (input, label) in dataset:
             label = dataset[1][0]
-            
+            #label = '0'
             (model, optimizer) = self.classifiers[label]
             
             model.to(device)
-            for elem in dataset[0]:
-                elem = elem.float()
-                predicted = model(elem)
-
-                loss = self.loss_function(elem.view(1,-1,args.num_features), predicted.view(1,-1,args.num_features))
+            for frames in dataset[0]:
                 optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                print("Sample %d :: Loss %f :: Model idx %d" % (batch, loss.item(), int(label)))
+                #print("Frames:: %d" % len(frames))
+                #asd = 0
+                for elem in frames:
+                    elem = elem.float()
+                    predicted = model(elem)
+
+                    loss = self.loss_function(elem.view(1,-1,args.num_features), predicted.view(1,-1,args.num_features))
+                    loss.backward()
+                    optimizer.step()
+                    #asd += 1
+            print("Sample %d :: Loss %f :: Model idx %d" % (batch, loss.item(), int(label)))
+            #print("Sanity %d" % asd)
             
     def eval_loop(self, evalDataLoader:D.DataLoader):
         for label, (model, _) in self.classifiers.items():
             model.eval()
-
+            model.to("cpu")
         accuracy = 0.0
         correct_labels = 0
 
@@ -139,8 +155,9 @@ class AANN_Classifer():
         
     def loss_function(self, target, predicted):
         #fn = nn.BCELoss()
-        fn = nn.BCEWithLogitsLoss()
-        #fn = nn.MSELoss()
+        #fn = nn.BCEWithLogitsLoss()
+        fn = nn.MSELoss()
+        #y, x = predicted // max(torch.argmax(predicted)), target // max(torch.argmax(target))
         return fn(predicted, target)
 
 

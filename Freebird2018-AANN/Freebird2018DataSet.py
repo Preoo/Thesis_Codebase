@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset
+import torch
 import csv
 import os
 class Freebird2018DataSet(Dataset):
@@ -20,14 +21,15 @@ class Freebird2018DataSet(Dataset):
     def __len__(self):
         
         return len(self.labels)
-
+    #TODO: Windowing, step over wav here.
     def __getitem__(self, index):
         #print("__getitem__")
         raw_features = self.feature_extractor.get_features(self.get_recording(index, self.dir))
         features_list = self.split_to_list(raw_features, 10)
         #print(features_list[0:1])
         #print("Raw feat_len: %d , List feat_len %d" % (len(raw_features), len(features_list)))
-        return features_list, self.labels[index]
+        return raw_features, self.labels[index]
+
 
     def parse_csv(self, data_dir):
         """
