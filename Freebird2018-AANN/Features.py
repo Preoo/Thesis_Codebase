@@ -32,7 +32,7 @@ class FeaturesMFCC:
             print("Incomplete wav chunk in file: %s. Substituting random.." % filePath)
             norm_signal = np.random.uniform(low=0.1, high=0.5, size=(441000,))
             samplerate = self.sample_rate_default
-        features = mfcc(signal, samplerate, self.win_length_sec, self.win_step_sec, self.num_features, appendEnergy=False)
+        features = mfcc(norm_signal, samplerate, self.win_length_sec, self.win_step_sec, self.num_features, appendEnergy=False)
         features = np.vstack((features, np.zeros(self.num_features)))
         #print("Features shape for 10s sample: ")
         #print(features.shape)
