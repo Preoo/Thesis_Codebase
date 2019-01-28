@@ -5,10 +5,10 @@ from torch import nn, optim
 from torch.nn import functional as F
 import torch.utils.data as D
 from torchvision import datasets, transforms
-from Freebird2018DataSet import Freebird2018DataSet
-from Features import FeaturesMFCC
+#from Freebird2018DataSet import Freebird2018DataSet
+#from Features import FeaturesMFCC
 
-parser = argparse.ArgumentParser(description='FreeBird2018_AANN_exp')
+parser = argparse.ArgumentParser(description='Using AANN commitie to classify')
 parser.add_argument('--batch-size', type=int, default=1, help='Input batch size, default 4')
 parser.add_argument('--epochs', type=int, default=1, metavar='N', help='Number of epoch to train')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Use cpu as device instead of CUDA')
@@ -46,8 +46,9 @@ eval_loader = D.DataLoader(
     datasets.MNIST(args.file_dir, train=False, transform=transforms.ToTensor()),
 batch_size=args.batch_size, shuffle=True)
 
-print("Downloaded?")
-
+if os.path.exists(args.file_dir):
+    print("Dataset is present on path: %s" % args.file_dir)
+    
 # Model AANN as a class here
 class AANN(nn.Module):
     def __init__(self):
@@ -69,12 +70,12 @@ class AANN(nn.Module):
 
     #define forward pass with ^ layers, should return output of model
     def forward(self, x):
-        #x.hape  = batch_nums x channels x width x height |1x1x28x28
+        #x.shape  = batch_nums x channels x width x height |1x1x28x28
         x = x.view(-1, 28*28)
         
         x = self.encode(x)
         x = self.decode(x)
-        #x = x.view(1,-1, self.nfeat)
+        #x = x.view(1,-1, 28, 28) #Possible return this in same shape as input to avoid .view() shennigans later?
         return x
 
 
@@ -83,7 +84,8 @@ class AANN(nn.Module):
 class AANN_Classifer():
     def __init__(self, *args, **kwargs):
         self.classifiers = {}
-        
+        self.accuracy = 0.0
+
     def add_new_model(self, model:AANN, label):
         #lr = 1e-3 <- copypaste since autocomplite is ass
         self.classifiers[label] = (model, optim.Adam(model.parameters()))
@@ -131,7 +133,7 @@ class AANN_Classifer():
         for label, (model, _) in self.classifiers.items():
             model.eval()
             model.to("cpu")
-        accuracy = 0.0
+        #accuracy = 0.0
         correct_labels = 0
 
         for batch, (inputs, labels) in enumerate(evalDataLoader):
@@ -143,8 +145,8 @@ class AANN_Classifer():
             if batch > 0 and batch % 500 == 0:
                 print(correct_labels/batch)
 
-        accuracy = correct_labels / len(evalDataLoader)
-        print("Correct: %f pcent" % accuracy)
+        self.accuracy = correct_labels / len(evalDataLoader)
+        print("Correct: %f pcent" % self.accuracy)
 
     def loss_function(self, target, predicted):
         #fn = nn.BCELoss()
@@ -153,11 +155,19 @@ class AANN_Classifer():
         #y, x = predicted // max(torch.argmax(predicted)), target // max(torch.argmax(target))
         return fn(predicted, target.view(-1, 28*28))
 
+    def save_classifier(to_file):
+        """Serialize to file"""
+        pass
 
-aann_classifier = AANN_Classifer()
+    def load_classifier(from_file):
+        """Load models from file"""
+        pass
+
+
 
 def main():
     print("main?")
+    aann_classifier = AANN_Classifer()
     for label in range(0,10):
         aann_classifier.add_new_model(AANN(), label)
     for epoch in range(1, args.epochs + 1):
