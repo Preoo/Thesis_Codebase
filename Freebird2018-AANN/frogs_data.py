@@ -7,18 +7,20 @@ class frogs_dataloader(Dataset):
     """description of class"""
 
     def __init__(self, data_file="Frogs_MFCC.csv"):
-        self.project_path = "f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data"
-        self.file_path = Path(self.project_path) / data_file
-        
-        #self.frogs_df = pd.read_csv(self.file_path)
+        #self.project_path = Path(__file__).parent
+        #self.file_path = Path(self.project_path) / "Data" / data_file
+        self.wtf = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
+        self.frogs_df = pd.read_csv(self.wtf)
+
     def __len__(self):
-        pass
+        return len(self.frogs_df)
 
     def __getitem__(self, index):
-        pass
+        return self.frogs_df.iloc[index]
 
     def test(self):
         print("???")
-        print(self.file_path)
-        print(Path.exists(self.file_path))
-        #print(self.frogs_df.head())
+        #print(self.file_path) #print correct path as string
+        #print(self.file_path.exists()) #prints False WTF??
+        print(self.frogs_df.head())
+        print(len(self.frogs_df))
