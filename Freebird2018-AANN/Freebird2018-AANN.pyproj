@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>7afcc102-124a-4295-ad61-1d55f6ca460b</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>Freebird2018_AANN.py</StartupFile>
+    <StartupFile>frogs.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -29,6 +29,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Freebird2018_AANN.py" />
+    <Compile Include="frogs.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="frogs_data.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="gettingtoknow.py">
       <SubType>Code</SubType>
     </Compile>
@@ -56,8 +62,12 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Checkpoints\" />
+    <Folder Include="Data\" />
     <Folder Include="Tests\" />
     <Folder Include="python_speech_features\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Data\Frogs_MFCCs.csv" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

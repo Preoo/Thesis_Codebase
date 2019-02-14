@@ -1,5 +1,7 @@
 import argparse
 import os
+import logging
+import matplotlib.pyplot as plt
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -10,7 +12,7 @@ from torchvision import datasets, transforms
 
 parser = argparse.ArgumentParser(description='Using AANN commitie to classify')
 parser.add_argument('--batch-size', type=int, default=1, help='Input batch size, default 4')
-parser.add_argument('--epochs', type=int, default=1, metavar='N', help='Number of epoch to train')
+parser.add_argument('--epochs', type=int, default=3, metavar='N', help='Number of epoch to train')
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Use cpu as device instead of CUDA')
 parser.add_argument('--file-dir', default='F:\\Downloads\\ff1010bird_wav', help='Directory of metadata and ./wav folder')
 parser.add_argument('--num-features', type=int, default=8, metavar='N', help='Number of MFCC Features')
@@ -38,12 +40,19 @@ args.file_dir = os.path.join('F:\\Downloads\\', 'MNIST')
 
 #print('Trainset has: ' + str(len(train_set)) + '. Evalset has: ' + str(len(eval_set)))
 print("Dataset init")
+
+img_transform = transforms.Compose([
+    transforms.ToTensor()#,
+    #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    #transforms.Normalize((0.1307,), (0.3081,))
+])
+
 train_loader = D.DataLoader(
     datasets.MNIST(args.file_dir, train=True, download=True,
-                   transform=transforms.ToTensor()),
+                   transform=img_transform),
     batch_size=args.batch_size, shuffle=True)
 eval_loader = D.DataLoader(
-    datasets.MNIST(args.file_dir, train=False, transform=transforms.ToTensor()),
+    datasets.MNIST(args.file_dir, train=False, transform=img_transform),
 batch_size=args.batch_size, shuffle=True)
 
 if os.path.exists(args.file_dir):
@@ -53,19 +62,30 @@ if os.path.exists(args.file_dir):
 class AANN(nn.Module):
     def __init__(self):
         super(AANN, self).__init__()
+        # best run ~0.9717 3 epochs
         self.nfeat = 1
-        
+        self.dim_c = 64 #best: 64
+        self.dim_e = 256 * 3 #best: 256*3
+        self.dim_h = 64
+
         self.encode = nn.Sequential(
-            nn.Linear(28*28, 400),
-            nn.ReLU(True),
-            nn.Linear(400, 20)
+            nn.Linear(28*28, self.dim_e),
+            nn.ReLU(),
+            #nn.Linear(self.dim_e, self.dim_h),
+            #nn.ReLU(),
+            #nn.Dropout(0.3),
+            nn.Linear(self.dim_e, self.dim_c),
+            nn.ReLU()
             )
 
         self.decode = nn.Sequential(
-            nn.Linear(20,400),
-            nn.ReLU(True),
-            nn.Linear(400, 28*28),
-            nn.Tanh()
+            nn.Linear(self.dim_c, self.dim_e),
+            nn.ReLU(),
+            #nn.Dropout(0.3),
+            #nn.Linear(self.dim_h, self.dim_e),
+            #nn.ReLU(),
+            nn.Linear(self.dim_e, 28*28),
+            nn.Sigmoid()
             )
 
     #define forward pass with ^ layers, should return output of model
@@ -88,7 +108,7 @@ class AANN_Classifer():
 
     def add_new_model(self, model:AANN, label):
         #lr = 1e-3 <- copypaste since autocomplite is ass
-        self.classifiers[label] = (model, optim.Adam(model.parameters()))
+        self.classifiers[label] = (model.to(device), optim.Adam(model.parameters()))
 
     def classify(self, input):
         # should run input over all classifiers and classify it by highest score, 
@@ -109,25 +129,28 @@ class AANN_Classifer():
             #model.to(device)
         train_loss = 0
         for batch, (inputs, labels) in enumerate(trainingDataLoader):
-            
+            #print(inputs.shape)
             inputs = inputs.to(device)
             labels = labels.to(device)
             (model, optimizer) = self.classifiers[labels.item()]
-            model.to(device)
+            #model.to(device)
             optimizer.zero_grad()
             pred_y = model(inputs)
-            #print(torch.max(inputs))
             loss = self.loss_function(inputs, pred_y)
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
-            #print(labels)
-
+            #mse_loss = nn.MSELoss()(pred_y.view(-1,1,28,28), inputs)
             
-            if batch % 500 == 0:
+            #or (int(labels.item() == 1)
+            if batch % 1000 == 0:
+                
                 print("Sample %d :: Loss %f :: Model idx %d" % (batch, loss.item(), int(labels.item())))
                 print("Progress: %d out of %d" % (batch, len(trainingDataLoader)))
-        print("Train loss total: %d" % train_loss)
+                #print("Output_max %f :: Output_min %f :: mse_loss %f" % (torch.max(inputs).item(), torch.min(inputs).item(), mse_loss.item()))
+            if batch % 100 == 0 and batch > 0 :
+                print("Running train loss: %f" % (train_loss / batch))
+        
             
     def eval_loop(self, evalDataLoader:D.DataLoader):
         for label, (model, _) in self.classifiers.items():
@@ -147,12 +170,14 @@ class AANN_Classifer():
 
         self.accuracy = correct_labels / len(evalDataLoader)
         print("Correct: %f pcent" % self.accuracy)
+        return self.accuracy
 
     def loss_function(self, target, predicted):
-        #fn = nn.BCELoss()
-        fn = nn.BCEWithLogitsLoss()
+        fn = nn.BCELoss()
+        #fn = nn.BCEWithLogitsLoss()
         #fn = nn.MSELoss()
         #y, x = predicted // max(torch.argmax(predicted)), target // max(torch.argmax(target))
+
         return fn(predicted, target.view(-1, 28*28))
 
     def save_classifier(to_file):
@@ -181,6 +206,8 @@ def main():
     with torch.no_grad():
         print("Evaluation loop")
         aann_classifier.eval_loop(eval_loader)
+
+
 
 if __name__ == "__main__":
     main()
