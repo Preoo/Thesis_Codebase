@@ -35,13 +35,16 @@
     <Compile Include="frogs_data.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="frogs_utils.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="gettingtoknow.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="python_speech_features\base.py" />
     <Compile Include="python_speech_features\sigproc.py" />
     <Compile Include="python_speech_features\__init__.py" />
-    <Compile Include="Tests\placeholderTest.py">
+    <Compile Include="Tests\frogs_tests.py">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
@@ -68,6 +71,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\Frogs_MFCCs.csv" />
+    <Content Include="Tests\testcase.csv" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
