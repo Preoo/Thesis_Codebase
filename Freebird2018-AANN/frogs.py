@@ -18,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 4
 #dataloading
 frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
-train_set, eval_set, species = generate_datasets(frogs_csv)
+train_set, eval_set, species_names = generate_datasets(frogs_csv)
 
 train_loader = D.DataLoader(train_set, batch_size)
 eval_loader = D.DataLoader(eval_set, batch_size)
