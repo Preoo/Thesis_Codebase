@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-def generate_datasets(from_file, split=0.9, class_label="Species", stratified=False, seed=None):
+def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True, stratified=False, seed=None):
     """ Generates tranining and eval datasets from source file(s) """
     
     if type(from_file) is not pd.DataFrame:    
@@ -13,10 +13,11 @@ def generate_datasets(from_file, split=0.9, class_label="Species", stratified=Fa
     
     frogs.drop(columns=["Family","Genus","RecordID"], inplace=True, errors='ignore')
     
-    if frogs["labels"].empty:
-        frogs["labels"] = pd.get_dummies(self.frogs[class_label]).values.tolist()
+    #if frogs["labels"].empty:
+    frogs["labels"] = pd.get_dummies(frogs[class_label]).values.argmax()
 
     species_names = list(frogs.Species.unique())
+    #frogs["labels"] = 
     frogs_np = frogs.to_numpy()
 
     len_trainingset = int(len(frogs_np) * split)
@@ -25,7 +26,7 @@ def generate_datasets(from_file, split=0.9, class_label="Species", stratified=Fa
     #should be a numpy array of 
     #Intrested in data from indices:
     #0:22, 24, 26 => since dropped columns, then 0:22, 23 for labels
-    frogs_features = frogs_np[:, 0:22]
+    frogs_features = frogs_np[:, 0:22].astype(np.float32)
     frogs_labels = frogs_np[:, 23]
 
     if stratified:

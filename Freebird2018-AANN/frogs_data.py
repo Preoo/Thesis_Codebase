@@ -1,8 +1,8 @@
 from torch.utils.data import Dataset
-
+import torch
 class frogs_dataset(Dataset):
 
-    def __init__(self, frogs=None, labels=None, unittest=False):
+    def __init__(self, frogs=None, labels=None, transform_fn=None):
         
         # Only species is of intrest to us
         
@@ -10,19 +10,22 @@ class frogs_dataset(Dataset):
         #self.generate_dataset(select_set, from_samples, n_folds=n_folds, stratified=stratified_folds)
         self.frogs = frogs
         self.labels = labels
-        self.testing =unittest
+        self.transform = transform_fn
+        #Pytorch doesn't expect numpy arrays but tensors, therefore we convert
+        if not self.transform:
+            self.transform = self.to_tensor
 
     def __len__(self):
         return len(self.frogs)
 
     def __getitem__(self, index):
+        return self.transform(self.frogs[index]), self.labels[index]
 
-        #Dummy method to aid with unittests, there must be a better way :P
-        if self.testing:
-            print(":D")
-        else:
-            return self.frogs[index], self.labels[index]
 
+    def to_tensor(self, input):
+        if type(input) is list:
+            return torch.as_tensor(input, dtype=torch.long)
+        return torch.from_numpy(input)
 
     #def test(self):
     #    print("???")

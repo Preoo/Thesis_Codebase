@@ -41,5 +41,8 @@ class Test_frogs_utilsTest(unittest.TestCase):
         for _ in range(len(X)):
             count = count + 1
         self.assertEqual(count, len(X), msg='Was able to iterate over dataset in for range loop')
+
+    def test_DatasetsAreShuffled(self):
+        X, Y, _ = generate_datasets(self.dummy_data)
 if __name__ == '__main__':
     unittest.main()
