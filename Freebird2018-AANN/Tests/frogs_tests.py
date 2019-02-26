@@ -23,14 +23,15 @@ class Test_frogs_utilsTest(unittest.TestCase):
         frogs_features = frogs_all[:, 0:22]
         frogs_labels = frogs_all[:, 26]
 
-        print(frogs_features)
-        print(frogs_labels)
+        #print(frogs_features)
+        #print(frogs_labels)
 
         self.assertTrue(True, msg='Test A is only to debug some behavior, always works.')
 
     def test_GenerateDataset(self):
 
         X, Y, species = generate_datasets(self.dummy_data)
+        print(species)
         self.assertGreater(len(species), 0, msg='It should generate list of labels to recover species name from model')
         self.assertGreater(len(X), len(Y), msg='Datset should be split into two sets where train set is larger')
 
