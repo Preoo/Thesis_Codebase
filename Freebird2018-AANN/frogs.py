@@ -8,7 +8,7 @@ from torch import optim as optim
 import torch.utils.data as D
 from torchvision import datasets, transforms
 
-from frogs_data import frogs_dataset
+#from frogs_data import Frogs_Dataset
 from frogs_utils import generate_datasets, generate_kfolds_datasets
 from pathlib import Path
 
@@ -16,11 +16,17 @@ from pathlib import Path
 epochs = 20
 learning_rate = 1e-2
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 128
+batch_size = 200
 report_interval = 500
 use_stratified = True
 n_folds = 10
 run_kfolds = True
+model_layout = {
+    "input":22,
+    "output":10,
+    "hidden":260,
+    "dropout":0.3
+    }
 #dataloading
 frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
 train_set, eval_set, species_names = generate_datasets(frogs_csv, split=0.9, stratified=use_stratified)
@@ -30,15 +36,15 @@ eval_loader = D.DataLoader(eval_set, batch_size)
 
 # Models, input is of shape 
 class FrogsNet(nn.Module):
-    def __init__(self, inputs=22, outputs=10, hidden=10):
+    def __init__(self, model_layout:dict):
         super(FrogsNet, self).__init__()
         
-        self.i = inputs
-        self.o = outputs
-        self.h = hidden
-        #self.h2 = max(int(self.h * 3), self.o)
-        #self.h3 = max(int(self.h * 2), self.o)
+        self.i = model_layout["input"]
+        self.o = model_layout["output"]
+        self.h = model_layout["hidden"]
+        self.d = model_layout["dropout"]
         self.f = nn.ReLU()
+        # *** Generates real good results with train/test split but tanks against CV ***
         #self.block = nn.Sequential(
         #    nn.Linear(self.i, self.h2),
         #    nn.BatchNorm1d(self.h2),
@@ -56,7 +62,7 @@ class FrogsNet(nn.Module):
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
             self.f,
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=self.d),
             nn.Linear(self.h, self.o)
             )
 
@@ -69,8 +75,9 @@ def loss_fn(pred, target):
     b = reg_loss(torch.argmax(pred).float(), target.float())
     return a + (b * 0.000001)
 
-model = FrogsNet(inputs=22,outputs=10,hidden=260).to(device)
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+model = FrogsNet(model_layout).to(device)
+#weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
+optimizer = optim.Adam(model.parameters(), lr=learning_rate) 
 cel_loss = nn.CrossEntropyLoss()
 reg_loss = nn.MSELoss()
 loss_function = cel_loss
@@ -119,6 +126,12 @@ with torch.no_grad():
         data, labels = data.to(device), labels.to(device)
         predicted = model(data)
         #Create a tensor with class indexes
+
+        #predicted is [class0, class1, ... , classN-1]
+        #where each element is models 'energy' representing probability of label for instance
+        #torch.max(, 1) returns an tensor with index along axis=1 e.g along rows.
+        #so max([[0, 0.25, 1, 0.25], [0.15, 0.6, 0.25, 0]],axis=1) => [2, 1] with shape (2, 1)
+
         _, predicted_label = torch.max(predicted.data, 1)
         #.size(0) is length of row dimension from matrix
         total += labels.size(0)
@@ -138,7 +151,7 @@ with torch.no_grad():
 #timer end and print
 print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
 
-#TODO: This is latenightbodge --> whole file should be refactored into methods train(),eval()
+#NOTE: This is latenightbodge --> whole file should be refactored into methods train(),eval()
 if run_kfolds:
     print("===========================")
     print("Running 10-fold eval")
@@ -148,7 +161,7 @@ if run_kfolds:
     
     for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv):
         
-        model = FrogsNet(inputs=22,outputs=10,hidden=22).to(device)
+        model = FrogsNet(model_layout).to(device)
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         
         #loss_function = nn.CrossEntropyLoss()
@@ -209,16 +222,14 @@ if run_kfolds:
 
             accuracy = correct / total
             print("Accuracy: %f" % (accuracy * 100.0))
-            print("Eval loop had following instances:")
-            print(labels_collection)
-            print("Number of eval samples: %d" % total)
 
             stats.append(accuracy)
     
     #get averaged accuracy
     n_acc = sum(stats)/float(len(stats))
-    print("n-folds")
-    print(n_acc*100)
+    #n_acc *= 100
+    print("n-fold mean accuracy: %f" % (n_acc * 100.0))
+    #print(n_acc*100)
 
 print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
 #exit and save checkpoint

@@ -1,7 +1,14 @@
 from torch.utils.data import Dataset
 import torch
-class frogs_dataset(Dataset):
-
+class Frogs_Dataset(Dataset):
+    """
+    Dataset holding frogs features and labels. 
+    Features are numpy array with columns corresponding to MFCC features.
+    Labels are single int representing the index position in species list.
+    Transform function is applied to frogs data before returning next item in iter() block,
+    if None is provided => default function to_tensor is used to create tensors.
+    User is required to handle tensor creation operation when custom transform_fn is provided.
+    """
     def __init__(self, frogs=None, labels=None, transform_fn=None):
         
         # Only species is of intrest to us
