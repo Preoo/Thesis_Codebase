@@ -9,7 +9,7 @@ import torch.utils.data as D
 from torchvision import datasets, transforms
 
 #from frogs_data import Frogs_Dataset
-from frogs_utils import generate_datasets, generate_kfolds_datasets
+from frogs_utils import generate_datasets, generate_kfolds_datasets, ConfusionMatrix
 from pathlib import Path
 
 #hyperparameter
@@ -20,7 +20,7 @@ batch_size = 200
 report_interval = 500
 use_stratified = True
 n_folds = 10
-run_kfolds = True
+run_kfolds = False
 model_layout = {
     "input":22,
     "output":10,
@@ -36,14 +36,16 @@ eval_loader = D.DataLoader(eval_set, batch_size)
 
 # Models, input is of shape 
 class FrogsNet(nn.Module):
-    def __init__(self, model_layout:dict):
+    def __init__(self, model_layout:dict={}):
         super(FrogsNet, self).__init__()
-        
-        self.i = model_layout["input"]
-        self.o = model_layout["output"]
-        self.h = model_layout["hidden"]
-        self.d = model_layout["dropout"]
-        self.f = nn.ReLU()
+        try:
+            self.i = model_layout["input"]
+            self.o = model_layout["output"]
+            self.h = model_layout["hidden"]
+            self.d = model_layout["dropout"]
+        except KeyError as ecpt:
+            raise ValueError("Passed model_layout with invalid params: ", ecpt)
+        self.f = nn.ReLU
         # *** Generates real good results with train/test split but tanks against CV ***
         #self.block = nn.Sequential(
         #    nn.Linear(self.i, self.h2),
@@ -61,7 +63,7 @@ class FrogsNet(nn.Module):
 
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
-            self.f,
+            self.f(),
             nn.Dropout(p=self.d),
             nn.Linear(self.h, self.o)
             )
@@ -119,10 +121,9 @@ with torch.no_grad():
     correct = 0
     
     labels_collection = {key:0 for key in range(10)}
-    
+    cm = ConfusionMatrix(labels=species_names)
 
     for batch, (data, labels) in enumerate(eval_loader):
-        #print("Sample")
         data, labels = data.to(device), labels.to(device)
         predicted = model(data)
         #Create a tensor with class indexes
@@ -142,11 +143,17 @@ with torch.no_grad():
         for l in labels.tolist():
             labels_collection[l] += 1
 
+        #Tally up confusionmatrix, datafrom cuda needs to moved to system memory first.. there has to be a better way
+        #Perhaps create a confusion matrix for each batch with tensors and move that to cpu and do a elementwise add?
+        cm.add_batch(predicted_labels=predicted_label.cpu().numpy() , target_labels=labels.cpu().numpy())
+
     accuracy = correct / total
     print("Accuracy: %f" % (accuracy * 100.0))
     print("Eval loop had following instances:")
     print(labels_collection)
     print("Number of eval samples: %d" % total)
+
+    print(cm)
 
 #timer end and print
 print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
@@ -164,7 +171,6 @@ if run_kfolds:
         model = FrogsNet(model_layout).to(device)
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         
-        #loss_function = nn.CrossEntropyLoss()
         train_loader = D.DataLoader(ftrain, batch_size)
         eval_loader = D.DataLoader(fevail, batch_size)
         
@@ -172,16 +178,12 @@ if run_kfolds:
 
             model.train()
             try:
-                #print("Training loop for epoch %d" % epoch)
-
                 loss_print = 0
 
                 for batch, (data, labels) in enumerate(train_loader):
-                    #print("Enumerate Train", batch, data, label)
 
                     data, labels = data.to(device), labels.to(device)
 
-                    #print("Batch #", batch)
                     optimizer.zero_grad()
                     predicted = model(data)
                     loss = loss_function(predicted, labels)
@@ -206,7 +208,7 @@ if run_kfolds:
     
 
             for batch, (data, labels) in enumerate(eval_loader):
-                #print("Sample")
+
                 data, labels = data.to(device), labels.to(device)
                 predicted = model(data)
                 #Create a tensor with class indexes
@@ -232,5 +234,8 @@ if run_kfolds:
     #print(n_acc*100)
 
 print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
-#exit and save checkpoint
-#Frogs().test()
+
+#Define train and eval functions.
+#Eval should return acc-metric and construct confusion matrix
+#Acc-metric should be used to compare and save checkpoint, implement that later
+#Define get_model() that returns model and optimizer. 
