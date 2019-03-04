@@ -20,7 +20,8 @@ batch_size = 200
 report_interval = 500
 use_stratified = True
 n_folds = 10
-run_kfolds = False
+run_kfolds = True
+verbose = False
 model_layout = {
     "input":22,
     "output":10,
@@ -95,11 +96,11 @@ def train(model, optimizer, loss_function=loss_function, train_loader=train_load
                 optimizer.zero_grad()
                 predicted = model(data)
                 loss = loss_function(predicted, labels)
-                loss.backward()
-                optimizer.step()
+                loss.backward() #calc w.grads for model
+                optimizer.step() #apply w.grads in backprop pass
                 loss_print += loss.item()
 
-                if batch % report_interval == 0:
+                if verbose and (batch % report_interval == 0):
                     print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
                     loss_print = 0
         except (KeyboardInterrupt, SystemExit):
@@ -109,7 +110,7 @@ def train(model, optimizer, loss_function=loss_function, train_loader=train_load
 def eval(model, eval_loader=eval_loader, species_names=species_names):
     with torch.no_grad():
         model.eval()
-        print("Evaluation loop")
+        
         total = 0
         correct = 0
     
@@ -142,28 +143,19 @@ def eval(model, eval_loader=eval_loader, species_names=species_names):
 
         accuracy = correct / total
         print("Accuracy: %f" % (accuracy * 100.0))
-        print("Eval loop had following instances:")
-        print(labels_collection)
-        print("Number of eval samples: %d" % total)
-        #print(cm)
+        if verbose:
+            print("Eval loop had following instances:")
+            print(labels_collection)
+            print("Number of eval samples: %d" % total)
+        
         return accuracy, cm
-
-#timer end and print
-
-
-train(model, optimizer)
-_, conmat = eval(model)
-print(conmat)
-print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
-#NOTE: This is latenightbodge --> whole file should be refactored into methods train(),eval()
+# This is a stand in main() function... use this if you add support for modules later
 if run_kfolds:
     print("===========================")
-    print("Running 10-fold eval")
+    print("Running %d-fold eval" % n_folds)
 
     stats = []
-    
-    
-    for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv):
+    for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
         
         model = FrogsNet(model_layout).to(device)
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -171,66 +163,23 @@ if run_kfolds:
         train_loader = D.DataLoader(ftrain, batch_size)
         eval_loader = D.DataLoader(fevail, batch_size)
         
-        for epoch in range(1, epochs + 1):
-
-            model.train()
-            try:
-                loss_print = 0
-
-                for batch, (data, labels) in enumerate(train_loader):
-
-                    data, labels = data.to(device), labels.to(device)
-
-                    optimizer.zero_grad()
-                    predicted = model(data)
-                    loss = loss_function(predicted, labels)
-                    loss.backward()
-                    optimizer.step()
-                    loss_print += loss.item()
-
-                    if batch % report_interval == 0:
-                        print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
-                        loss_print = 0
-            except (KeyboardInterrupt, SystemExit):
-                print("Exiting...")
-                raise
-
-        with torch.no_grad():
-            model.eval()
-            print("Evaluation loop")
-            total = 0
-            correct = 0
-    
-            labels_collection = {key:0 for key in range(10)}
-    
-
-            for batch, (data, labels) in enumerate(eval_loader):
-
-                data, labels = data.to(device), labels.to(device)
-                predicted = model(data)
-                #Create a tensor with class indexes
-                _, predicted_label = torch.max(predicted.data, 1)
-                #.size(0) is length of row dimension from matrix
-                total += labels.size(0)
-                #Sum over tensor where predicted label == target label and increment correct by that value
-                correct += (predicted_label == labels).sum().item()
-
-                #collect information on label distributation in eval set
-                for l in labels.tolist():
-                    labels_collection[l] += 1
-
-            accuracy = correct / total
-            print("Accuracy: %f" % (accuracy * 100.0))
-
-            stats.append(accuracy)
-    
+        train(model, optimizer, train_loader=train_loader)
+        acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader)
+        stats.append((acc_nfold, cm_nfold))
     #get averaged accuracy
-    n_acc = sum(stats)/float(len(stats))
-    #n_acc *= 100
+    n_acc = sum([a for a, _ in stats])/float(len(stats))
     print("n-fold mean accuracy: %f" % (n_acc * 100.0))
-    #print(n_acc*100)
-
-    print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
-
-
+    cuml_cm = ConfusionMatrix(labels=species_names)
+    for _, cm_nfold in stats:
+        cuml_cm + cm_nfold
+    print("======= %d-fold cumulutive confusion matrix =======" % n_folds)
+    print(cuml_cm)
+    print("Training loop and eval for k-fold processing length: %f secs" % (time.perf_counter() - timer_start))
+else:
+    print("== Training loop ==")
+    train(model, optimizer)
+    print("== Evaluating loop ==")
+    _, conmat = eval(model)
+    print(conmat)
+    print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
 #Acc-metric should be used to compare and save checkpoint, implement that later
