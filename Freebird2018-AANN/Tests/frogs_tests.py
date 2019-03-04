@@ -68,5 +68,25 @@ class Test_frogs_utilsTest(unittest.TestCase):
         self.assertTrue(np.array_equal(cm3.matrix, expected), msg='__add__ didnt yield expected result')
         self.assertTrue(np.array_equal(cm3.matrix, cm1.matrix), msg='__add__ didnt mutate first class')
         self.assertTrue(isinstance(cm3, ConfusionMatrix), msg='__add__ didnt return a ConfusionMatrix class')
+
+    def test_kNN_resolves_correct_label(self):
+        #dummy data x,y,z : xy are data and z is label
+        
+        mock_data = np.array([[1,1,1], [2,2,2], [3,3,2]], dtype=np.float)
+        feat, label = mock_data[:, :2], mock_data[:, 2]
+        
+        from frogs_data import Frogs_Dataset
+        X = Frogs_Dataset(frogs=feat[:2, :], labels=label[:2])
+        y = Frogs_Dataset(frogs=feat[2:, :], labels=label[2:])
+
+        #import torch
+
+        Y, expected = y[0]
+        from frogs_kNN import Frogs_kNN
+        knn = Frogs_kNN()
+        res = knn.fit(X, Y)
+
+        was_correct = np.array_equal(expected, res)
+        self.assertTrue(was_correct, msg='kNN returned wrong label')
 if __name__ == '__main__':
     unittest.main()
