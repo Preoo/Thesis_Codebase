@@ -4,35 +4,50 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold, KFold
 
-def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True, stratified=False, seed=None):
-    """ Generates tranining and eval datasets from source file(s) """
-    
-    if type(from_file) is not pd.DataFrame:    
-        frogs = pd.read_csv(from_file)
-    else:
+def generate_frogs_from_dataframe(from_file, class_label="Species"):
+    """ 
+    Generate pandas.Dataframe from existing dataframe or read a .csv into a dataframe.
+    Drop useless columns and add new such as labels to index.
+    Returns numpy array and label strings list. Inserted label index can be used to retrieve
+    class name corresponding to that label index.
+    """
+
+    if isinstance(from_file, pd.DataFrame):
         frogs = from_file.copy()
+    else:
+        frogs = pd.read_csv(from_file)
     
     frogs.drop(columns=["Family","Genus","RecordID"], inplace=True, errors='ignore')
-    #from pathlib import Path
-    #frogs.to_csv(Path("f:\\Downloads\\Frogs_ICU\\frogs_mfcc_stubbed.csv"))
-    #if frogs["labels"].empty:
-    #frogs["labels"] = pd.get_dummies(frogs.Species).values.argmax()
 
     species_names = list(frogs[class_label].unique())
-    #print(species_names)
     temp_labels = [species_names.index(frog) for frog in list(frogs[class_label])]
     frogs["labels"] = temp_labels
     frogs_np = frogs.to_numpy()
+    return frogs_np, species_names
 
-    len_trainingset = int(len(frogs_np) * split)
+def get_features_labels_as_numpy(frogs_np):
+    """
+    Exctract only features and labels you are about.
+    Return objecs should be used as inputs to train/test splitter
+    """
+
+    frogs_features = frogs_np[:, 0:22].astype(np.float32)
+    frogs_labels = frogs_np[:, 23]
+
+    return frogs_features, frogs_labels
+
+def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True, stratified=False, seed=None):
+    """ Generates tranining and eval datasets from source file(s) """
+    
+    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label="Species")
+    
     test_frac = 1 - split
 
     #should be a numpy array of 
     #Intrested in data from indices:
     #0:22, 24, 26 => since dropped columns, then 0:22, 23 for labels
-    frogs_features = frogs_np[:, 0:22].astype(np.float32)
-    frogs_labels = frogs_np[:, 23]
-    #print("??", np.max(frogs_labels))
+    frogs_features, frogs_labels = get_features_labels_as_numpy(frogs_np)
+    
     if stratified:
         #Need to make sure train_set and eval_set have same fraction of classes
         #needed if dataset has unbalanced number of instances of classes
@@ -50,27 +65,9 @@ def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True,
 def generate_kfolds_datasets(from_file, kfolds=10, class_label="Species", shuffle=True, stratified=None, seed=None):
     """ Returns an iterable which yields folds """
     
-    if type(from_file) is not pd.DataFrame:    
-        frogs = pd.read_csv(from_file)
-    else:
-        frogs = from_file.copy()
-    
-    frogs.drop(columns=["Family","Genus","RecordID"], inplace=True, errors='ignore')
-    #from pathlib import Path
-    #frogs.to_csv(Path("f:\\Downloads\\Frogs_ICU\\frogs_mfcc_stubbed.csv"))
-    #if frogs["labels"].empty:
-    #frogs["labels"] = pd.get_dummies(frogs.Species).values.argmax()
+    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label="Species")
 
-    species_names = list(frogs[class_label].unique())
-    #print(species_names)
-    temp_labels = [species_names.index(frog) for frog in list(frogs[class_label])]
-    frogs["labels"] = temp_labels
-    frogs_np = frogs.to_numpy()
-
-    
-    frogs_features = frogs_np[:, 0:22].astype(np.float32)
-    frogs_labels = frogs_np[:, 23]
-    #print("??", np.max(frogs_labels))    
+    frogs_features, frogs_labels = get_features_labels_as_numpy(frogs_np)  
     
     foldG = StratifiedKFold(n_splits=kfolds, shuffle=shuffle)
 
@@ -109,6 +106,13 @@ class ConfusionMatrix:
         
         for r, c in zip(predicted_labels.flat, target_labels.flat):
             self.results.at[self.labels[r], self.labels[c]] += 1
+
+    def __add__(self, other):
+        ''' Overload + operator for easier summing of confusion matrixes! Beware this operation mutates 1st class! '''
+        if not isinstance(other, ConfusionMatrix):
+            raise TypeError("Add only with same type")
+        self.results = self.results.add(other.results)
+        return self
 
     def __repr__(self):
         ''' 

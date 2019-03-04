@@ -72,92 +72,89 @@ class FrogsNet(nn.Module):
         out =  self.block(x)
         return out
 
-def loss_fn(pred, target):
-    a = cel_loss(pred, target)
-    b = reg_loss(torch.argmax(pred).float(), target.float())
-    return a + (b * 0.000001)
-
 model = FrogsNet(model_layout).to(device)
 #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
-optimizer = optim.Adam(model.parameters(), lr=learning_rate) 
-cel_loss = nn.CrossEntropyLoss()
-reg_loss = nn.MSELoss()
-loss_function = cel_loss
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+loss_function = nn.CrossEntropyLoss()
 
 #timer start
 timer_start = time.perf_counter()
-#training
-for epoch in range(1, epochs + 1):
+
+def train(model, optimizer, loss_function=loss_function, train_loader=train_loader, epochs=epochs):
     model.train()
-    try:
-        #print("Training loop for epoch %d" % epoch)
+    for epoch in range(1, epochs + 1):
+        try:
+            loss_print = 0
 
-        loss_print = 0
+            for batch, (data, labels) in enumerate(train_loader):
+                #print("Enumerate Train", batch, data, label)
 
-        for batch, (data, labels) in enumerate(train_loader):
-            #print("Enumerate Train", batch, data, label)
+                data, labels = data.to(device), labels.to(device)
 
-            data, labels = data.to(device), labels.to(device)
+                #print("Batch #", batch)
+                optimizer.zero_grad()
+                predicted = model(data)
+                loss = loss_function(predicted, labels)
+                loss.backward()
+                optimizer.step()
+                loss_print += loss.item()
 
-            #print("Batch #", batch)
-            optimizer.zero_grad()
-            predicted = model(data)
-            loss = loss_function(predicted, labels)
-            loss.backward()
-            optimizer.step()
-            loss_print += loss.item()
+                if batch % report_interval == 0:
+                    print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
+                    loss_print = 0
+        except (KeyboardInterrupt, SystemExit):
+            print("Exiting...")
+            raise
 
-            if batch % report_interval == 0:
-                print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
-                loss_print = 0
-    except (KeyboardInterrupt, SystemExit):
-        print("Exiting...")
-        raise
-#eval
-with torch.no_grad():
-    model.eval()
-    print("Evaluation loop")
-    total = 0
-    correct = 0
+def eval(model, eval_loader=eval_loader, species_names=species_names):
+    with torch.no_grad():
+        model.eval()
+        print("Evaluation loop")
+        total = 0
+        correct = 0
     
-    labels_collection = {key:0 for key in range(10)}
-    cm = ConfusionMatrix(labels=species_names)
+        labels_collection = {key:0 for key in range(10)}
+        cm = ConfusionMatrix(labels=species_names)
 
-    for batch, (data, labels) in enumerate(eval_loader):
-        data, labels = data.to(device), labels.to(device)
-        predicted = model(data)
-        #Create a tensor with class indexes
+        for batch, (data, labels) in enumerate(eval_loader):
+            data, labels = data.to(device), labels.to(device)
+            predicted = model(data)
+            #Create a tensor with class indexes
 
-        #predicted is [class0, class1, ... , classN-1]
-        #where each element is models 'energy' representing probability of label for instance
-        #torch.max(, 1) returns an tensor with index along axis=1 e.g along rows.
-        #so max([[0, 0.25, 1, 0.25], [0.15, 0.6, 0.25, 0]],axis=1) => [2, 1] with shape (2, 1)
+            #predicted is [class0, class1, ... , classN-1]
+            #where each element is models 'energy' representing probability of label for instance
+            #torch.max(, 1) returns an tensor with index along axis=1 e.g along rows.
+            #so max([[0, 0.25, 1, 0.25], [0.15, 0.6, 0.25, 0]],axis=1) => [2, 1] with shape (2, 1)
 
-        _, predicted_label = torch.max(predicted.data, 1)
-        #.size(0) is length of row dimension from matrix
-        total += labels.size(0)
-        #Sum over tensor where predicted label == target label and increment correct by that value
-        correct += (predicted_label == labels).sum().item()
+            _, predicted_label = torch.max(predicted.data, 1)
+            #.size(0) is length of row dimension from matrix
+            total += labels.size(0)
+            #Sum over tensor where predicted label == target label and increment correct by that value
+            correct += (predicted_label == labels).sum().item()
 
-        #collect information on label distributation in eval set
-        for l in labels.tolist():
-            labels_collection[l] += 1
+            #collect information on label distributation in eval set
+            for l in labels.tolist():
+                labels_collection[l] += 1
 
-        #Tally up confusionmatrix, datafrom cuda needs to moved to system memory first.. there has to be a better way
-        #Perhaps create a confusion matrix for each batch with tensors and move that to cpu and do a elementwise add?
-        cm.add_batch(predicted_labels=predicted_label.cpu().numpy() , target_labels=labels.cpu().numpy())
+            #Tally up confusionmatrix, datafrom cuda needs to moved to system memory first.. there has to be a better way
+            #Perhaps create a confusion matrix for each batch with tensors and move that to cpu and do a elementwise add?
+            cm.add_batch(predicted_labels=predicted_label.cpu().numpy() , target_labels=labels.cpu().numpy())
 
-    accuracy = correct / total
-    print("Accuracy: %f" % (accuracy * 100.0))
-    print("Eval loop had following instances:")
-    print(labels_collection)
-    print("Number of eval samples: %d" % total)
-
-    print(cm)
+        accuracy = correct / total
+        print("Accuracy: %f" % (accuracy * 100.0))
+        print("Eval loop had following instances:")
+        print(labels_collection)
+        print("Number of eval samples: %d" % total)
+        #print(cm)
+        return accuracy, cm
 
 #timer end and print
-print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
 
+
+train(model, optimizer)
+_, conmat = eval(model)
+print(conmat)
+print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
 #NOTE: This is latenightbodge --> whole file should be refactored into methods train(),eval()
 if run_kfolds:
     print("===========================")
@@ -233,9 +230,7 @@ if run_kfolds:
     print("n-fold mean accuracy: %f" % (n_acc * 100.0))
     #print(n_acc*100)
 
-print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
+    print("Training loop and eval processing length: %f secs" % (time.perf_counter() - timer_start))
 
-#Define train and eval functions.
-#Eval should return acc-metric and construct confusion matrix
+
 #Acc-metric should be used to compare and save checkpoint, implement that later
-#Define get_model() that returns model and optimizer. 

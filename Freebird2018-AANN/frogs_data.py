@@ -30,7 +30,7 @@ class Frogs_Dataset(Dataset):
 
 
     def to_tensor(self, input):
-        if type(input) is list:
+        if isinstance(input,list):
             return torch.as_tensor(input, dtype=torch.long)
         return torch.from_numpy(input)
 

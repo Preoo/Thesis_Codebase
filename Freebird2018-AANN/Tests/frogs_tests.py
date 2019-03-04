@@ -55,5 +55,18 @@ class Test_frogs_utilsTest(unittest.TestCase):
         expected = np.array([[2, 0], [1, 2]])
         self.assertTrue(np.array_equal(cm.matrix, expected), msg='Confusion matrix added batches wrong. See test for more information.')
 
+    def test_ConfusionMatrixCumulative(self):
+
+        cm1 = ConfusionMatrix(labels=["a","b"])
+        cm2 = ConfusionMatrix(labels=["a","b"])
+
+        cm1.results += 1
+        cm2.results += 2
+        self.assertTrue(np.array_equal(cm1.matrix, np.ones((2,2), dtype=np.int)), msg='Dataframe in confusionmatrix cant be added into')
+        cm3 = cm1 + cm2
+        expected = np.array([[3, 3], [3, 3]],dtype=np.int)
+        self.assertTrue(np.array_equal(cm3.matrix, expected), msg='__add__ didnt yield expected result')
+        self.assertTrue(np.array_equal(cm3.matrix, cm1.matrix), msg='__add__ didnt mutate first class')
+        self.assertTrue(isinstance(cm3, ConfusionMatrix), msg='__add__ didnt return a ConfusionMatrix class')
 if __name__ == '__main__':
     unittest.main()
