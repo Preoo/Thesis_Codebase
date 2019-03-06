@@ -12,20 +12,29 @@ class Frogs_kNN:
     def get_euclidian_dist(self, x, y):
         #assume we have two tensors
         #p-norm of (x-y), p=2 yeilds euclidian norm
-        return torch.dist(x, y, p=2).item()
-
+        #x.shape(N,22) y.shape(1,22)
+        w = torch.pow(x-y,2)
+        w = torch.sum(w,1)
+        w = torch.sqrt(w)
+        return w
+        #return torch.dist(x, y, p=2).item()
+        
     def fit(self, X, y):
         #X is dataset with neightbours, Y is datapoint e.g. single measurement to classify
         #Returns predicted label from dataset.
         self.distance_index.clear()
         
-        for i, (feature, label) in enumerate(X):
-            distance = self.get_euclidian_dist(feature, y)
-            self.distance_index.append((distance, i))
+        #for i, (feature, label) in enumerate(X):
+        #    distance = self.get_euclidian_dist(feature, y)
+        #    self.distance_index.append((distance, i))
+        f, _ = X[:]
+        distances = self.get_euclidian_dist(f,y) #should return with shape X.0, 
 
-        self.distance_index.sort()
+        #self.distance_index.sort()
         #sorted by distance => just take k from this list
-        k_nearest_distances_idx = [idx for _, idx in self.distance_index[:self.k]]
+        #k_nearest_distances_idx = [idx for _, idx in self.distance_index[:self.k]]
+        _, k_nearest_distances_idx = torch.topk(distances, self.k, largest=False)
+        k_nearest_distances_idx = k_nearest_distances_idx[:]
         #get most common, if unclear, resort to first
         most_common = Counter(k_nearest_distances_idx).most_common(1)
         most_common, _ = most_common[0] #Counter.most_common returns a list of tuples(what,count)
