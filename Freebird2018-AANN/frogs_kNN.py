@@ -12,12 +12,15 @@ class Frogs_kNN:
     def get_euclidian_dist(self, x, y):
         #assume we have two tensors
         #p-norm of (x-y), p=2 yeilds euclidian norm
-        #x.shape(N,22) y.shape(1,22)
+        #return torch.dist(x, y, p=2).item()
+
+        #Using numpy broadcasting
+        #https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#module-numpy.doc.broadcasting
+        #x.shape(N,22) y.shape(22)
         w = torch.pow(x-y,2)
         w = torch.sum(w,1)
         w = torch.sqrt(w)
         return w
-        #return torch.dist(x, y, p=2).item()
         
     def fit(self, X, y):
         #X is dataset with neightbours, Y is datapoint e.g. single measurement to classify
