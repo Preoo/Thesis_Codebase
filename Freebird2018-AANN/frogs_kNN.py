@@ -13,10 +13,9 @@ class Frogs_kNN:
         self.k = k_nearest
 
     def get_euclidian_dist(self, x, y):
-
         #Using numpy broadcasting
         #https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#module-numpy.doc.broadcasting
-        #x.shape(N,22) y.shape(22) w.shape(N,)
+
         w = torch.pow(x-y,2)
         w = torch.sum(w,1)
         w = torch.sqrt(w)
@@ -36,13 +35,16 @@ class Frogs_kNN:
         _, k_nearest_distances_idx = torch.topk(distances, self.k, largest=False)
         #Retrieve values with python slicing, .item() only works for single values not lists or arrays
         k_nearest_distances_idx = k_nearest_distances_idx[:]
-
-        #get most common, if unclear, resort to first
-        most_common = Counter(k_nearest_distances_idx).most_common(1)
-        most_common, _ = most_common[0] #Counter.most_common returns a list of tuples(what,count)
-        #return label from dataset based on most common index
-        _, predicted = X[most_common]
-        return predicted
+        
+        _, labels = X[k_nearest_distances_idx]
+        #is single label, just return as is
+        if type(labels) is int:
+            return labels
+        
+        #for numpy arrays, we need most common
+        labels = labels.astype(int) #from object to int, makes a copy
+        labels, counts = np.unique(labels, return_counts=True)
+        return labels[np.argmax(counts)]
 
 def run():
     n_folds = 10
@@ -52,7 +54,7 @@ def run():
 
     stats = []
     for ftrain, fevail, species_names in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
-        kNN = Frogs_kNN(k_nearest=15)
+        kNN = Frogs_kNN(k_nearest=1)
         correct_fold = 0
         real = []
         pred = []
@@ -64,7 +66,7 @@ def run():
             #    print("Debug 2")
             
             y_pred = kNN.fit(ftrain, y)
-            if y_pred  == t:
+            if y_pred == t:
                 correct_fold += 1
             real.append(t)
             pred.append(y_pred)

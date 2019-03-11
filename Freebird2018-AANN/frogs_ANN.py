@@ -191,14 +191,15 @@ def run():
         print("======= %d-fold cumulutive confusion matrix =======" % n_folds)
         print(cuml_cm)
         print("Training loop and eval for k-fold processing length: %f secs" % (time.perf_counter() - timer_start))
+        return n_acc, cuml_cm
     else:
         print("== Training loop ==")
         model, optimizer = build_model_optimizer()
         train(model, optimizer)
         print("== Evaluating loop ==")
-        _, conmat = eval(model)
-        print(conmat)
+        acc_split, cm_split = eval(model)
+        print(cm_split)
         print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
-
+        return acc_split, cm_split
 if __name__ == "__main__":
     run()
