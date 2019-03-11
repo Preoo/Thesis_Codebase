@@ -14,7 +14,7 @@ from pathlib import Path
 
 #hyperparameter
 epochs = 20
-learning_rate = 1e-2
+learning_rate = 1e-2 #seems high, could cause bad performance with sensitive models... 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 200
 report_interval = 500
@@ -47,20 +47,6 @@ class FrogsNet(nn.Module):
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
         self.f = nn.ReLU
-        # *** Generates real good results with train/test split but tanks against CV ***
-        #self.block = nn.Sequential(
-        #    nn.Linear(self.i, self.h2),
-        #    nn.BatchNorm1d(self.h2),
-        #    nn.ELU(),
-        #    nn.Dropout(p=0.2),
-        #    nn.Linear(self.h2, self.h),
-        #    nn.BatchNorm1d(self.h),
-        #    nn.ELU(),
-        #    nn.Dropout(p=0.2),
-        #    nn.Linear(self.h, self.o),
-        #    nn.BatchNorm1d(self.o)
-        #    #CrossEntropyLoss combines LogSoftmax and NLLoss
-        #    )
 
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
@@ -73,13 +59,40 @@ class FrogsNet(nn.Module):
         out =  self.block(x)
         return out
 
-model = FrogsNet(model_layout).to(device)
-#weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+class FrogsCNN(nn.Module):
+    def __init__(self):
+        super(FrogsCNN, self).__init__()
+        self.cnv = nn.Sequential(
+            nn.Conv1d(1, 11, 2),
+            nn.ReLU(),
+            #nn.MaxPool1d(2)
+            )
+        self.fc = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(21*11, 100),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(100, 10)
+            )
+
+    def forward(self, x):
+        x = x.view(-1, 1, 22) #reshape from (22) => (2,11)
+        x = self.cnv(x)
+        x = x.view(-1, 11*21) #conv returns (featuremaps=11, i-k=21)
+        x = self.fc(x)
+        return x
+
+
 loss_function = nn.CrossEntropyLoss()
 
-#timer start
-timer_start = time.perf_counter()
+def build_model_optimizer():
+    """Build and return model and optimzer to simplify flow"""
+    model = FrogsNet(model_layout).to(device)
+    #model = FrogsCNN().to(device)
+    #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    return model, optimizer
 
 def train(model, optimizer, loss_function=loss_function, train_loader=train_loader, epochs=epochs):
     model.train()
@@ -149,37 +162,43 @@ def eval(model, eval_loader=eval_loader, species_names=species_names):
             print("Number of eval samples: %d" % total)
         
         return accuracy, cm
-# This is a stand in main() function... use this if you add support for modules later
-if run_kfolds:
-    print("===========================")
-    print("Running %d-fold eval" % n_folds)
 
-    stats = []
-    for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
+# This is a stand in main() function... use this if you add support for modules later
+def run():
+    #timer start
+    timer_start = time.perf_counter()
+    if run_kfolds:
+        print("===========================")
+        print("Running %d-fold eval" % n_folds)
+
+        stats = []
+        for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
         
-        model = FrogsNet(model_layout).to(device)
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+            model, optimizer = build_model_optimizer()
         
-        train_loader = D.DataLoader(ftrain, batch_size)
-        eval_loader = D.DataLoader(fevail, batch_size)
+            train_loader = D.DataLoader(ftrain, batch_size)
+            eval_loader = D.DataLoader(fevail, batch_size)
         
-        train(model, optimizer, train_loader=train_loader)
-        acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader)
-        stats.append((acc_nfold, cm_nfold))
-    #get averaged accuracy
-    n_acc = sum([a for a, _ in stats])/float(len(stats))
-    print("n-fold mean accuracy: %f" % (n_acc * 100.0))
-    cuml_cm = ConfusionMatrix(labels=species_names)
-    for _, cm_nfold in stats:
-        cuml_cm + cm_nfold
-    print("======= %d-fold cumulutive confusion matrix =======" % n_folds)
-    print(cuml_cm)
-    print("Training loop and eval for k-fold processing length: %f secs" % (time.perf_counter() - timer_start))
-else:
-    print("== Training loop ==")
-    train(model, optimizer)
-    print("== Evaluating loop ==")
-    _, conmat = eval(model)
-    print(conmat)
-    print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
-#Acc-metric should be used to compare and save checkpoint, implement that later
+            train(model, optimizer, train_loader=train_loader)
+            acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader)
+            stats.append((acc_nfold, cm_nfold))
+        #get averaged accuracy
+        n_acc = sum([a for a, _ in stats])/float(len(stats))
+        print("n-fold mean accuracy: %f" % (n_acc * 100.0))
+        cuml_cm = ConfusionMatrix(labels=species_names)
+        for _, cm_nfold in stats:
+            cuml_cm + cm_nfold
+        print("======= %d-fold cumulutive confusion matrix =======" % n_folds)
+        print(cuml_cm)
+        print("Training loop and eval for k-fold processing length: %f secs" % (time.perf_counter() - timer_start))
+    else:
+        print("== Training loop ==")
+        model, optimizer = build_model_optimizer()
+        train(model, optimizer)
+        print("== Evaluating loop ==")
+        _, conmat = eval(model)
+        print(conmat)
+        print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
+
+if __name__ == "__main__":
+    run()

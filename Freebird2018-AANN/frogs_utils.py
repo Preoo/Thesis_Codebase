@@ -120,3 +120,5 @@ class ConfusionMatrix:
         However this is not required, and if __str__ is not defined => __repr__ is called
         '''
         return self.results.to_string()
+
+# Create timer decorators which prints out statistics?
