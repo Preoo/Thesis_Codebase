@@ -88,5 +88,21 @@ class Test_frogs_utilsTest(unittest.TestCase):
 
         was_correct = np.array_equal(expected, res)
         self.assertTrue(was_correct, msg='kNN returned wrong label')
+
+    def test_kNN_resolves_correct_most_common(self):
+        from frogs_data import Frogs_Dataset
+        from frogs_kNN import Frogs_kNN
+        kNN = Frogs_kNN(k_nearest=3)
+        mock = np.array([[1,1,1], [2,2,1], [3,3,2], [4,4,1]], dtype=np.float)
+        
+        f, c = mock[:, :2], mock[:, 2]
+        X = Frogs_Dataset(frogs=f[:3, :], labels=c[:3])
+        y = Frogs_Dataset(frogs=f[3:, :], labels=c[3:])
+        Y, expected = y[0]
+        res = kNN.fit(X, Y)
+
+        was_correct = np.array_equal(expected, res)
+        self.assertTrue(was_correct, msg='kNN returned wrong label')
+
 if __name__ == '__main__':
     unittest.main()
