@@ -11,10 +11,6 @@ class Frogs_Dataset(Dataset):
     """
     def __init__(self, frogs=None, labels=None, transform_fn=None):
         
-        # Only species is of intrest to us
-        
-        #self.frogs_data["labels"] = pd.get_dummies(self.frogs_data.Species).values.tolist()
-        #self.generate_dataset(select_set, from_samples, n_folds=n_folds, stratified=stratified_folds)
         self.frogs = frogs
         self.labels = labels
         self.transform = transform_fn
@@ -34,21 +30,6 @@ class Frogs_Dataset(Dataset):
             return torch.as_tensor(input, dtype=torch.long)
         return torch.from_numpy(input)
 
-    #def test(self):
-    #    print("???")
-    #    #print(self.file_path) #print correct path as string
-    #    #print(self.file_path.exists()) #prints False WTF??
-    #    print(self.frogs_data.head())
-    #    print(len(self.frogs_data))
-    #    print(self.frogs_data.describe())
-
-    #    self.frogs_data["labels"] = pd.get_dummies(self.frogs_data.Species).values.tolist()
-    #    #print(pd.get_dummies(self.frogs_df.Species))
-    #    print(self.frogs_data.head())
-    #    print(self.frogs_data.describe())
-        
-    #    test = self.frogs_data.iloc[0].take([i for i in range(22)])
-    #    print(test)
 """
 Frogs dataframe describe
                 MFCCs_1      MFCCs_2      MFCCs_3  ...     MFCCs_20     MFCCs_21     MFCCs_22
