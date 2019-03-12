@@ -37,14 +37,13 @@ class Frogs_kNN:
         k_nearest_distances_idx = k_nearest_distances_idx[:]
         
         _, labels = X[k_nearest_distances_idx]
-        #is single label, just return as is
-        if type(labels) is int:
-            return labels
-        
         #for numpy arrays, we need most common
-        labels = labels.astype(int) #from object to int, makes a copy
-        labels, counts = np.unique(labels, return_counts=True)
-        return labels[np.argmax(counts)]
+        if isinstance(labels, np.ndarray):
+            labels = labels.astype(int) #from object to int, makes a copy
+            labels, counts = np.unique(labels, return_counts=True)
+            return labels[np.argmax(counts)]
+        #is single label, just return as is
+        return labels
 
 def run():
     n_folds = 10
