@@ -71,15 +71,13 @@ class Test_frogs_utilsTest(unittest.TestCase):
 
     def test_kNN_resolves_correct_label(self):
         #dummy data x,y,z : xy are data and z is label
-        
+        #Define dtype=np.float since many of pytorch operations don' support longtensor-type
         mock_data = np.array([[1,1,1], [2,2,2], [3,3,2]], dtype=np.float)
         feat, label = mock_data[:, :2], mock_data[:, 2]
         
         from frogs_data import Frogs_Dataset
         X = Frogs_Dataset(frogs=feat[:2, :], labels=label[:2])
         y = Frogs_Dataset(frogs=feat[2:, :], labels=label[2:])
-
-        #import torch
 
         Y, expected = y[0]
         from frogs_kNN import Frogs_kNN
@@ -90,6 +88,7 @@ class Test_frogs_utilsTest(unittest.TestCase):
         self.assertTrue(was_correct, msg='kNN returned wrong label')
 
     def test_kNN_resolves_correct_most_common(self):
+        #Used to test against bug where kNN acted always as if k=1
         from frogs_data import Frogs_Dataset
         from frogs_kNN import Frogs_kNN
         kNN = Frogs_kNN(k_nearest=3)
