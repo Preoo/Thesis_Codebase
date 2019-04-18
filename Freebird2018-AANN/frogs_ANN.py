@@ -12,9 +12,12 @@ from torchvision import datasets, transforms
 from frogs_utils import generate_datasets, generate_kfolds_datasets, ConfusionMatrix
 from pathlib import Path
 
+#feature from audio using librosa
+#import librosa
+
 #hyperparameter
 epochs = 20
-learning_rate = 1e-2 #seems high, could cause bad performance with sensitive models... 
+learning_rate = 1e-2 #seems high, maybe cause dead units with ReLU 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 200
 report_interval = 500
@@ -47,7 +50,9 @@ class FrogsNet(nn.Module):
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
         self.f = nn.ReLU
-
+        # Return to this and override or correct initialized  weights for ReLU.
+        # Default init is uniform with 0 mean and can result in dead units.
+        # Update: nevermind, nn.ReLU sets correct weights in it class __init__
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
             self.f(),
@@ -82,7 +87,7 @@ class FrogsCNN(nn.Module):
         x = self.fc(x)
         return x
 
-
+# Combines LogSoftmax and NLLLoss(negative log likelihood loss) in one layer
 loss_function = nn.CrossEntropyLoss()
 
 def build_model_optimizer():
@@ -90,7 +95,8 @@ def build_model_optimizer():
     model = FrogsNet(model_layout).to(device)
     #model = FrogsCNN().to(device)
     #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    #optimizer = optim.Adadelta(model.parameters())
 
     return model, optimizer
 
