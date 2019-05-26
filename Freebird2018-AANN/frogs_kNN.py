@@ -20,7 +20,11 @@ class Frogs_kNN:
         w = torch.sum(w,1)
         w = torch.sqrt(w)
         return w
-        
+    
+    def get_cosine_similarity(self, x, y):
+        a = torch.sum(torch.mul(x,y) ,1)
+        b = torch.sqrt( torch.sum(torch.pow(x,2),1 ) ) * torch.sqrt( torch.sum(torch.pow(y,2) ) )
+        return a / b
     def fit(self, X, y):
         """
         X is dataset with neightbours, Y is datapoint e.g. single measurement to classify
@@ -29,8 +33,9 @@ class Frogs_kNN:
         
         #select all features from training Frogs dataset
         x, _ = X[:]
-        distances = self.get_euclidian_dist(x,y) #should return with shape X.0, 
-        
+        distances = self.get_euclidian_dist(x,y) #Set largest=False
+        #distances = self.get_cosine_similarity(x,y) #Set largest=True
+
         # topk returns a tensor with k-first values from other tensor. largest=False inverts order
         _, k_nearest_distances_idx = torch.topk(distances, self.k, largest=False)
         #Retrieve values with python slicing, .item() only works for single values not lists or arrays

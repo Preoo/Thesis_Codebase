@@ -19,12 +19,12 @@ from pathlib import Path
 epochs = 20
 learning_rate = 1e-2 #seems high, maybe cause dead units with ReLU 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 200
+batch_size = 400
 report_interval = 500
 use_stratified = True
 n_folds = 10
 run_kfolds = True
-verbose = False
+verbose = True
 model_layout = {
     "input":22,
     "output":10,
@@ -50,6 +50,7 @@ class FrogsNet(nn.Module):
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
         self.f = nn.ReLU
+        
         # Return to this and override or correct initialized  weights for ReLU.
         # Default init is uniform with 0 mean and can result in dead units.
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
@@ -87,8 +88,35 @@ class FrogsCNN(nn.Module):
         x = self.fc(x)
         return x
 
+def NLLRLoss(predicted_classes, correct_class, reduction='sum'):
+    """
+    Calculates NLLRLoss described in paper: https://arxiv.org/pdf/1804.10690.pdf
+
+    L(x,y_i) = -[log(x[y_i] - log((sum(x) - x[y_i]))]
+
+    Inputs should be raw outputs of net. Since this net used crossentropyloss, 
+    this function will apply softmax as well to play well with current model. 
+    inputs: (prediction:Tensor, correctClassIndex:number) ->
+    output: loss:Tensor after reduction operation, as backward() expects a scalar value
+    """
+    reduction_ops = {
+        'mean': torch.mean,
+        'sum' : torch.sum
+        }
+    #Use of regular softmax was unstable, which led to nan-losses, prob since denominator tends to 0.
+    #This mess gives results comparable to common crossentropy-loss imported from pytorch module.
+    probs_class = nn.functional.log_softmax(predicted_classes)
+
+    #--Before testing exp-reversing :&
+    correct_probs = torch.gather(probs_class, 1, correct_class.view(-1,1)).squeeze()
+    sum_incorrect_probs = torch.sum(probs_class, 1) - correct_probs
+ 
+    loss = correct_probs / sum_incorrect_probs
+    return reduction_ops[reduction](loss)
+
 # Combines LogSoftmax and NLLLoss(negative log likelihood loss) in one layer
 loss_function = nn.CrossEntropyLoss()
+#loss_function = NLLRLoss
 
 def build_model_optimizer():
     """Build and return model and optimzer to simplify flow"""
@@ -108,20 +136,20 @@ def train(model, optimizer, loss_function=loss_function, train_loader=train_load
 
             for batch, (data, labels) in enumerate(train_loader):
                 #print("Enumerate Train", batch, data, label)
+                with torch.autograd.detect_anomaly():
+                    data, labels = data.to(device), labels.to(device)
 
-                data, labels = data.to(device), labels.to(device)
+                    #print("Batch #", batch)
+                    optimizer.zero_grad()
+                    predicted = model(data)
+                    loss = loss_function(predicted, labels)
+                    loss.backward() #calc w.grads for model
+                    optimizer.step() #apply w.grads in backprop pass
+                    loss_print += loss.item()
 
-                #print("Batch #", batch)
-                optimizer.zero_grad()
-                predicted = model(data)
-                loss = loss_function(predicted, labels)
-                loss.backward() #calc w.grads for model
-                optimizer.step() #apply w.grads in backprop pass
-                loss_print += loss.item()
-
-                if verbose and (batch % report_interval == 0):
-                    print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
-                    loss_print = 0
+                    if verbose and (batch % report_interval == 0):
+                        print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
+                        loss_print = 0
         except (KeyboardInterrupt, SystemExit):
             print("Exiting...")
             raise
