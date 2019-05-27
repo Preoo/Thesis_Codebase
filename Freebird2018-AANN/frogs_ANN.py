@@ -17,9 +17,10 @@ from pathlib import Path
 
 #hyperparameter
 epochs = 20
-learning_rate = 1e-2 #seems high, maybe cause dead units with ReLU 
+learning_rate = 1e-2 #seems high, maybe cause dead units with ReLU
+w_decay = 1e-4 #weight decay hyperparam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 400
+batch_size = 200
 report_interval = 500
 use_stratified = True
 n_folds = 10
@@ -28,7 +29,7 @@ verbose = True
 model_layout = {
     "input":22,
     "output":10,
-    "hidden":260,
+    "hidden":120,
     "dropout":0.3
     }
 #dataloading
@@ -50,7 +51,8 @@ class FrogsNet(nn.Module):
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
         self.f = nn.ReLU
-        
+        #self.f = nn.SELU
+        self.h2 = int(self.h / 10)
         # Return to this and override or correct initialized  weights for ReLU.
         # Default init is uniform with 0 mean and can result in dead units.
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
@@ -109,6 +111,7 @@ def NLLRLoss(predicted_classes, correct_class, reduction='sum'):
 
     #--Before testing exp-reversing :&
     correct_probs = torch.gather(probs_class, 1, correct_class.view(-1,1)).squeeze()
+
     sum_incorrect_probs = torch.sum(probs_class, 1) - correct_probs
  
     loss = correct_probs / sum_incorrect_probs
@@ -123,7 +126,7 @@ def build_model_optimizer():
     model = FrogsNet(model_layout).to(device)
     #model = FrogsCNN().to(device)
     #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=w_decay)
     #optimizer = optim.Adadelta(model.parameters())
 
     return model, optimizer
