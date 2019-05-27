@@ -16,11 +16,11 @@ from pathlib import Path
 #import librosa
 
 #hyperparameter
-epochs = 20
-learning_rate = 1e-2 #seems high, maybe cause dead units with ReLU
-w_decay = 1e-4 #weight decay hyperparam
+epochs = 100
+learning_rate = 1e-3 #seems high, maybe cause dead units with ReLU
+w_decay = 1e-5 #weight decay hyperparam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 200
+batch_size = 400
 report_interval = 500
 use_stratified = True
 n_folds = 10
@@ -59,8 +59,10 @@ class FrogsNet(nn.Module):
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
             self.f(),
-            nn.Dropout(p=self.d),
-            nn.Linear(self.h, self.o)
+            #nn.Dropout(p=self.d),
+            nn.LayerNorm(self.h),
+            nn.Linear(self.h, self.o),
+            #nn.LayerNorm(self.o)
             )
 
     def forward(self, x):
