@@ -9,8 +9,9 @@ class Frogs_kNN:
     k Nearest Neightbour classifier for Frogs dataset.
     Usage: Initialize this class first to set value for k. Call fit to classify.
     """
-    def __init__(self, k_nearest=1):
+    def __init__(self, k_nearest=1, metric='euclidian'):
         self.k = k_nearest
+        self.metric = metric
 
     def get_euclidian_dist(self, x, y):
         #Using numpy broadcasting
@@ -25,6 +26,18 @@ class Frogs_kNN:
         a = torch.sum(torch.mul(x,y) ,1)
         b = torch.sqrt( torch.sum(torch.pow(x,2),1 ) ) * torch.sqrt( torch.sum(torch.pow(y,2) ) )
         return a / b
+
+    def get_criterion_metric(self, metric=''):
+        available_metrics = {
+            "euclidian" : (self.get_euclidian_dist, False),
+            "cosine" : (self.get_cosine_similarity, True)
+            }
+        try:
+            return available_metrics[metric]
+        except KeyError:
+            print(f'Metric for "{metric}" is not implemented for kNN.')
+            raise
+
     def fit(self, X, y):
         """
         X is dataset with neightbours, Y is datapoint e.g. single measurement to classify
@@ -33,11 +46,12 @@ class Frogs_kNN:
         
         #select all features from training Frogs dataset
         x, _ = X[:]
-        distances = self.get_euclidian_dist(x,y) #Set largest=False
+        #distances = self.get_euclidian_dist(x,y) #Set largest=False
         #distances = self.get_cosine_similarity(x,y) #Set largest=True
-
+        metric_func, sort_by = self.get_criterion_metric(self.metric)
+        distances = metric_func(x,y)
         # topk returns a tensor with k-first values from other tensor. largest=False inverts order
-        _, k_nearest_distances_idx = torch.topk(distances, self.k, largest=False)
+        _, k_nearest_distances_idx = torch.topk(distances, self.k, largest=sort_by)
         #Retrieve values with python slicing, .item() only works for single values not lists or arrays
         k_nearest_distances_idx = k_nearest_distances_idx[:]
         
@@ -58,7 +72,7 @@ def run():
 
     stats = []
     for ftrain, fevail, species_names in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
-        kNN = Frogs_kNN(k_nearest=1)
+        kNN = Frogs_kNN(k_nearest=1, metric='cosine')
         correct_fold = 0
         real = []
         pred = []
