@@ -16,7 +16,7 @@ from pathlib import Path
 #import librosa
 
 #hyperparameter
-epochs = 100
+epochs = 150
 learning_rate = 1e-3 #seems high, maybe cause dead units with ReLU
 w_decay = 1e-5 #weight decay hyperparam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,14 +34,14 @@ model_layout = {
     }
 #dataloading
 frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
-train_set, eval_set, species_names = generate_datasets(frogs_csv, split=0.9, stratified=use_stratified)
+#train_set, eval_set, species_names = generate_datasets(frogs_csv, split=0.9, stratified=use_stratified)
 
-train_loader = D.DataLoader(train_set, batch_size)
-eval_loader = D.DataLoader(eval_set, batch_size)
+#train_loader = D.DataLoader(train_set, batch_size)
+#eval_loader = D.DataLoader(eval_set, batch_size)
 
 # Models, input is of shape 
 class FrogsNet(nn.Module):
-    def __init__(self, model_layout:dict={}):
+    def __init__(self, model_layout:dict={}, activation_fn=None):
         super(FrogsNet, self).__init__()
         try:
             self.i = model_layout["input"]
@@ -50,9 +50,8 @@ class FrogsNet(nn.Module):
             self.d = model_layout["dropout"]
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
-        self.f = nn.ReLU
+        self.f = activation_fn
         #self.f = nn.SELU
-        self.h2 = int(self.h / 10)
         # Return to this and override or correct initialized  weights for ReLU.
         # Default init is uniform with 0 mean and can result in dead units.
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
@@ -125,7 +124,7 @@ loss_function = nn.CrossEntropyLoss()
 
 def build_model_optimizer():
     """Build and return model and optimzer to simplify flow"""
-    model = FrogsNet(model_layout).to(device)
+    model = FrogsNet(model_layout, activation_fn=nn.ReLU).to(device)
     #model = FrogsCNN().to(device)
     #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=w_decay)
@@ -133,7 +132,9 @@ def build_model_optimizer():
 
     return model, optimizer
 
-def train(model, optimizer, loss_function=loss_function, train_loader=train_loader, epochs=epochs):
+def train(model, optimizer, loss_function=loss_function, train_loader=None, epochs=epochs):
+    if train_loader is None:
+        raise TypeError("Callee is required to pass in valid instance of dataloader. This is fatal.")
     model.train()
     for epoch in range(1, epochs + 1):
         try:
@@ -159,7 +160,11 @@ def train(model, optimizer, loss_function=loss_function, train_loader=train_load
             print("Exiting...")
             raise
 
-def eval(model, eval_loader=eval_loader, species_names=species_names):
+def eval(model, eval_loader=None, species_names=None):
+    if eval_loader is None:
+        raise TypeError("Callee is required to pass in valid instance of dataloader. This is fatal.")
+    if not isinstance(species_names, list):
+        raise TypeError("species_names must be a list of strings representing true labels.")
     with torch.no_grad():
         model.eval()
         
@@ -211,7 +216,7 @@ def run():
         print("Running %d-fold eval" % n_folds)
 
         stats = []
-        for ftrain, fevail, _ in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
+        for ftrain, fevail, species_names in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
         
             model, optimizer = build_model_optimizer()
         
@@ -219,7 +224,7 @@ def run():
             eval_loader = D.DataLoader(fevail, batch_size)
         
             train(model, optimizer, train_loader=train_loader)
-            acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader)
+            acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader, species_names=species_names)
             stats.append((acc_nfold, cm_nfold))
         #get averaged accuracy
         n_acc = sum([a for a, _ in stats])/float(len(stats))
@@ -240,5 +245,17 @@ def run():
         print(cm_split)
         print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
         return acc_split, cm_split
+
+def save_model(to_file):
+    """ Save model to file with eval statistics. """
+
+    raise NotImplementedError
+
+def load_model(from_file):
+    """ Load saved model from file. """
+
+    raise NotImplementedError
+
+
 if __name__ == "__main__":
     run()
