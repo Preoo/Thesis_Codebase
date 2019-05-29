@@ -58,8 +58,9 @@ class FrogsNet(nn.Module):
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
             self.f(),
-            #nn.Dropout(p=self.d),
-            nn.LayerNorm(self.h),
+            #nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
+            nn.GroupNorm(1, self.h),
+            #nn.LayerNorm(self.h), #equivalent with above
             nn.Linear(self.h, self.o),
             #nn.LayerNorm(self.o)
             )
