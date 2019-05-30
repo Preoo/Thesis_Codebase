@@ -33,7 +33,7 @@ model_layout = {
     "dropout":0.3
     }
 #dataloading
-frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
+#frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
 #train_set, eval_set, species_names = generate_datasets(frogs_csv, split=0.9, stratified=use_stratified)
 
 #train_loader = D.DataLoader(train_set, batch_size)
@@ -92,7 +92,7 @@ class FrogsCNN(nn.Module):
         x = self.fc(x)
         return x
 
-def NLLRLoss(predicted_classes, correct_class, reduction='sum'):
+def NLLRLoss(predicted_classes, correct_class, reduction='mean'):
     """
     Calculates NLLRLoss described in paper: https://arxiv.org/pdf/1804.10690.pdf
 
@@ -107,16 +107,34 @@ def NLLRLoss(predicted_classes, correct_class, reduction='sum'):
         'mean': torch.mean,
         'sum' : torch.sum
         }
-    #Use of regular softmax was unstable, which led to nan-losses, prob since denominator tends to 0.
+    #Use of regular softmax was unstable, which quickly led to nan-losses, prob since denominator tends to 0.
     #This mess gives results comparable to common crossentropy-loss imported from pytorch module.
     probs_class = nn.functional.log_softmax(predicted_classes)
 
-    #--Before testing exp-reversing :&
+    """
+    Could set probs to 0 after extracting correct_probs before summing. This could simplify division into substraction.
+    Based on snippet from: https://discuss.pytorch.org/t/update-specific-columns-of-each-row-in-a-torch-tensor/5597
+
+    x = torch.FloatTensor([[ 0,  1,  2],
+                           [ 3,  4,  5],
+                           [ 6,  7,  8],
+                           [ 9, 10, 11]])
+
+    j = torch.arange(x.size(0)).long()
+
+    x[j, correct_class] = 0
+    """
     correct_probs = torch.gather(probs_class, 1, correct_class.view(-1,1)).squeeze()
 
-    sum_incorrect_probs = torch.sum(probs_class, 1) - correct_probs
- 
-    loss = correct_probs / sum_incorrect_probs
+    #sum_incorrect_probs = torch.sum(probs_class, 1) - correct_probs
+    #Implementation of above scheme..
+
+    sum_incorrect_probs = probs_class.clone().detach()
+    j = torch.arange(sum_incorrect_probs.size(0)).long()
+    sum_incorrect_probs[j, correct_class] = 0
+    sum_incorrect_probs = torch.sum(sum_incorrect_probs, 1)
+    #loss = correct_probs / sum_incorrect_probs
+    loss = torch.neg(correct_probs - sum_incorrect_probs)
     return reduction_ops[reduction](loss)
 
 # Combines LogSoftmax and NLLLoss(negative log likelihood loss) in one layer
@@ -125,7 +143,7 @@ loss_function = nn.CrossEntropyLoss()
 
 def build_model_optimizer():
     """Build and return model and optimzer to simplify flow"""
-    model = FrogsNet(model_layout, activation_fn=nn.ReLU).to(device)
+    model = FrogsNet(model_layout, activation_fn=nn.LeakyReLU).to(device)
     #model = FrogsCNN().to(device)
     #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=w_decay)
@@ -210,6 +228,8 @@ def eval(model, eval_loader=None, species_names=None):
 
 # This is a stand in main() function... use this if you add support for modules later
 def run():
+
+    frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
     #timer start
     timer_start = time.perf_counter()
     if run_kfolds:

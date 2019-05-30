@@ -39,7 +39,7 @@ def get_features_labels_as_numpy(frogs_np):
 def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True, stratified=False, seed=None):
     """ Generates tranining and eval datasets from source file(s) """
     
-    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label="Species")
+    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label=class_label)
     
     test_frac = 1 - split
 
@@ -65,7 +65,7 @@ def generate_datasets(from_file, split=0.9, class_label="Species", shuffle=True,
 def generate_kfolds_datasets(from_file, kfolds=10, class_label="Species", shuffle=True, stratified=None, seed=None):
     """ Returns an iterable which yields folds """
     
-    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label="Species")
+    frogs_np, species_names = generate_frogs_from_dataframe(from_file, class_label=class_label)
 
     frogs_features, frogs_labels = get_features_labels_as_numpy(frogs_np)  
     
