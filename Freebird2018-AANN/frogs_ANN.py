@@ -55,13 +55,17 @@ class FrogsNet(nn.Module):
         # Return to this and override or correct initialized  weights for ReLU.
         # Default init is uniform with 0 mean and can result in dead units.
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
+        # Update: nn.Linear set initial weights with kaiming_uniform_ for leaky_relu nonlinearity by default.
+        # no need to extend Linear class with such functionality.
         self.block = nn.Sequential(
             nn.Linear(self.i, self.h),
+            #nn.GroupNorm(1, self.h),
             self.f(),
             #nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
             nn.GroupNorm(1, self.h),
             #nn.LayerNorm(self.h), #equivalent with above
             nn.Linear(self.h, self.o),
+            #nn.GroupNorm(1, self.o),
             #nn.LayerNorm(self.o)
             )
 
@@ -74,8 +78,8 @@ class FrogsCNN(nn.Module):
         super(FrogsCNN, self).__init__()
         self.cnv = nn.Sequential(
             nn.Conv1d(1, 11, 2),
-            nn.ReLU(),
-            #nn.MaxPool1d(2)
+            #nn.ReLU(),
+            nn.MaxPool1d(2)
             )
         self.fc = nn.Sequential(
             nn.Dropout(p=0.5),
