@@ -16,7 +16,7 @@ from pathlib import Path
 #import librosa
 
 #hyperparameter
-epochs = 150
+epochs = 20 #150
 learning_rate = 1e-3 #seems high, maybe cause dead units with ReLU
 w_decay = 1e-5 #weight decay hyperparam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,23 +30,19 @@ model_layout = {
     "input":22,
     "output":10,
     "hidden":120,
-    "dropout":0.3
+    "hidden_layers":1,
+    "dropout":0.0
     }
-#dataloading
-#frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
-#train_set, eval_set, species_names = generate_datasets(frogs_csv, split=0.9, stratified=use_stratified)
-
-#train_loader = D.DataLoader(train_set, batch_size)
-#eval_loader = D.DataLoader(eval_set, batch_size)
 
 # Models, input is of shape 
 class FrogsNet(nn.Module):
-    def __init__(self, model_layout:dict={}, activation_fn=None):
+    def __init__(self, model_layout:dict={}, activation_fn=nn.ReLU):
         super(FrogsNet, self).__init__()
         try:
             self.i = model_layout["input"]
             self.o = model_layout["output"]
             self.h = model_layout["hidden"]
+            self.l = model_layout["hidden_layers"]
             self.d = model_layout["dropout"]
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
@@ -57,20 +53,42 @@ class FrogsNet(nn.Module):
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
         # Update: nn.Linear set initial weights with kaiming_uniform_ for leaky_relu nonlinearity by default.
         # no need to extend Linear class with such functionality.
-        self.block = nn.Sequential(
+        self.i2h = nn.Sequential(
             nn.Linear(self.i, self.h),
-            #nn.GroupNorm(1, self.h),
-            self.f(),
-            #nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
             nn.GroupNorm(1, self.h),
-            #nn.LayerNorm(self.h), #equivalent with above
+            self.f(),
+            nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
+            #nn.GroupNorm(1, self.h),
+            )
+        self.h2h = nn.Sequential(
+            nn.Linear(self.h, self.h),
+            nn.GroupNorm(1, self.h),
+            self.f(),
+            nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
+            #nn.GroupNorm(1, self.h),
+            )
+        self.autocoder = nn.Sequential(
+            nn.Linear(self.h, 6),
+            self.f(),
+            nn.GroupNorm(1, 6),
+            nn.Linear(6, self.h),
+            self.f(),
+            nn.GroupNorm(1, self.h),
+            )
+        self.h2o = nn.Sequential(
             nn.Linear(self.h, self.o),
-            #nn.GroupNorm(1, self.o),
-            #nn.LayerNorm(self.o)
             )
 
     def forward(self, x):
-        out =  self.block(x)
+        out = self.i2h(x)
+
+        if self.l > 1:
+            for _ in range(self.l):
+                out = self.h2h(out)
+        
+        #out = self.autocoder(out)
+
+        out = self.h2o(out)
         return out
 
 class FrogsCNN(nn.Module):
@@ -78,7 +96,7 @@ class FrogsCNN(nn.Module):
         super(FrogsCNN, self).__init__()
         self.cnv = nn.Sequential(
             nn.Conv1d(1, 11, 2),
-            #nn.ReLU(),
+            nn.ReLU(),
             nn.MaxPool1d(2)
             )
         self.fc = nn.Sequential(
@@ -130,14 +148,21 @@ def NLLRLoss(predicted_classes, correct_class, reduction='mean'):
     """
     correct_probs = torch.gather(probs_class, 1, correct_class.view(-1,1)).squeeze()
 
-    #sum_incorrect_probs = torch.sum(probs_class, 1) - correct_probs
     #Implementation of above scheme..
 
+    #Detach disconnects this tensor from accumulating gradients.
+    #Reason: we manipulate values and don'twant them to affect gradients.
     sum_incorrect_probs = probs_class.clone().detach()
     j = torch.arange(sum_incorrect_probs.size(0)).long()
     sum_incorrect_probs[j, correct_class] = 0
+
+    sum_incorrect_probs = torch.exp(sum_incorrect_probs)
+
     sum_incorrect_probs = torch.sum(sum_incorrect_probs, 1)
-    #loss = correct_probs / sum_incorrect_probs
+
+    sum_incorrect_probs = torch.log(sum_incorrect_probs)
+
+    #Calculate negative log loss. 
     loss = torch.neg(correct_probs - sum_incorrect_probs)
     return reduction_ops[reduction](loss)
 
@@ -245,15 +270,16 @@ def run():
         
             model, optimizer = build_model_optimizer()
         
-            train_loader = D.DataLoader(ftrain, batch_size)
-            eval_loader = D.DataLoader(fevail, batch_size)
+            train_loader = D.DataLoader(ftrain, batch_size, shuffle=True)
+            eval_loader = D.DataLoader(fevail, batch_size, shuffle=True)
         
             train(model, optimizer, train_loader=train_loader)
             acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader, species_names=species_names)
             stats.append((acc_nfold, cm_nfold))
         #get averaged accuracy
         n_acc = sum([a for a, _ in stats])/float(len(stats))
-        print("n-fold mean accuracy: %f" % (n_acc * 100.0))
+        std_deviation = ((sum([(a - n_acc) ** 2 for a, _ in stats]))/float(len(stats) - 1) ) ** 0.5
+        print("n-fold mean accuracy: %f +- %f" % (n_acc * 100.0, std_deviation * 100))
         cuml_cm = ConfusionMatrix(labels=species_names)
         for _, cm_nfold in stats:
             cuml_cm + cm_nfold

@@ -93,7 +93,8 @@ def run():
         stats.append((acc_nfold, cm_nfold))
     #get averaged accuracy
     n_acc = sum([a for a, _ in stats])/float(len(stats))
-    print("%d-fold mean accuracy: %f" % (n_folds, n_acc * 100.0))
+    std_deviation = ((sum([(a - n_acc) ** 2 for a, _ in stats]))/float(len(stats) - 1) ) ** 0.5
+    print("%d-fold mean accuracy: %f +- %f" % (n_folds, n_acc * 100.0, std_deviation * 100))
     cuml_cm = ConfusionMatrix(labels=species_names)
     for _, cm_nfold in stats:
         cuml_cm + cm_nfold
