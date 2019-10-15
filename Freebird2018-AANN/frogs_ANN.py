@@ -15,25 +15,8 @@ from pathlib import Path
 #feature from audio using librosa
 #import librosa
 
-#hyperparameter
-epochs = 20 #150
-learning_rate = 1e-3 #seems high, maybe cause dead units with ReLU
-w_decay = 1e-5 #weight decay hyperparam
+from frogs_hyperparams import hyperparams
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 400
-report_interval = 500
-use_stratified = True
-n_folds = 10
-run_kfolds = True
-verbose = True
-model_layout = {
-    "input":22,
-    "output":10,
-    "hidden":120,
-    "hidden_layers":1,
-    "dropout":0.0
-    }
-
 # Models, input is of shape 
 class FrogsNet(nn.Module):
     def __init__(self, model_layout:dict={}, activation_fn=nn.ReLU):
@@ -47,7 +30,7 @@ class FrogsNet(nn.Module):
         except KeyError as ecpt:
             raise ValueError("Passed model_layout with invalid params: ", ecpt)
         self.f = activation_fn
-        #self.f = nn.SELU
+
         # Return to this and override or correct initialized  weights for ReLU.
         # Default init is uniform with 0 mean and can result in dead units.
         # Update: nevermind, nn.ReLU sets correct weights in it class __init__
@@ -56,28 +39,24 @@ class FrogsNet(nn.Module):
         self.i2h = nn.Sequential(
             nn.Linear(self.i, self.h),
             nn.GroupNorm(1, self.h),
+            #nn.BatchNorm1d(self.h), #equal in performance with GroupNorm for 1 group.
             self.f(),
             nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
-            #nn.GroupNorm(1, self.h),
             )
         self.h2h = nn.Sequential(
             nn.Linear(self.h, self.h),
             nn.GroupNorm(1, self.h),
             self.f(),
             nn.Dropout(p=self.d), #doesn't seems to affect acc if used with layernorm
-            #nn.GroupNorm(1, self.h),
-            )
-        self.autocoder = nn.Sequential(
-            nn.Linear(self.h, 6),
-            self.f(),
-            nn.GroupNorm(1, 6),
-            nn.Linear(6, self.h),
-            self.f(),
-            nn.GroupNorm(1, self.h),
             )
         self.h2o = nn.Sequential(
             nn.Linear(self.h, self.o),
             )
+        # To not use group norm, we remove these layers from container
+        if not model_layout['use_groupnorm']:
+            del self.i2h[1]
+            del self.h2h[1]
+            
 
     def forward(self, x):
         out = self.i2h(x)
@@ -85,8 +64,6 @@ class FrogsNet(nn.Module):
         if self.l > 1:
             for _ in range(self.l):
                 out = self.h2h(out)
-        
-        #out = self.autocoder(out)
 
         out = self.h2o(out)
         return out
@@ -167,12 +144,22 @@ def NLLRLoss(predicted_classes, correct_class, reduction='mean'):
     return reduction_ops[reduction](loss)
 
 # Combines LogSoftmax and NLLLoss(negative log likelihood loss) in one layer
-loss_function = nn.CrossEntropyLoss()
+#loss_function = nn.CrossEntropyLoss()
 #loss_function = NLLRLoss
 
-def build_model_optimizer():
+def build_model_optimizer(model_layout=None, learning_rate=1e-4, w_decay=0, activation_function=nn.ReLU, **kwargs):
     """Build and return model and optimzer to simplify flow"""
-    model = FrogsNet(model_layout, activation_fn=nn.LeakyReLU).to(device)
+    if model_layout is None: 
+        model_layout = {
+            "input" : kwargs['input_nodes'],
+            "output" : kwargs['output_nodes'],
+            "hidden" :kwargs['hidden_nodes'],
+            "hidden_layers" : kwargs['hidden_layers'],
+            "dropout" : kwargs['dropout_prop'],
+            "use_groupnorm" : kwargs['use_groupnorm']
+            }
+
+    model = FrogsNet(model_layout, activation_fn=activation_function).to(device)
     #model = FrogsCNN().to(device)
     #weight_decay=1e-3 in few research papers such as in https://arxiv.org/pdf/1711.05101.pdf
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=w_decay)
@@ -180,11 +167,18 @@ def build_model_optimizer():
 
     return model, optimizer
 
-def train(model, optimizer, loss_function=loss_function, train_loader=None, epochs=epochs):
+def train(model, optimizer, loss_function, train_loader=None, epochs=0, **kwargs):
     if train_loader is None:
         raise TypeError("Callee is required to pass in valid instance of dataloader. This is fatal.")
-    model.train()
+    
+    #train_stats = []
+    training_stats = {'epoch':[], 'loss':[], 'training_eval':[] }
+
+    verbose = kwargs.get('verbose', False)
+    report_interval = kwargs.get('report_interval', 1)
     for epoch in range(1, epochs + 1):
+        model.train()
+        
         try:
             loss_print = 0
 
@@ -204,21 +198,39 @@ def train(model, optimizer, loss_function=loss_function, train_loader=None, epoc
                     if verbose and (batch % report_interval == 0):
                         print("Epoch:%d, Batch:%d, Loss:%f" % (epoch, batch, loss_print))
                         loss_print = 0
+
+            #Append statistics to return dict after each epoch
+            training_stats['epoch'].append(epoch)
+            training_stats['loss'].append(loss_print)
+
+            #somestats = {'epoch':epoch, 'loss':loss_print}
+            if 'eval_loader' in kwargs:
+                train_acc, _ = eval(model, kwargs['eval_loader'])
+                training_stats['training_eval'].append(train_acc)
+                #somestats['train_acc'] = train_acc
+                if verbose:
+                    print(f"Evaluation during training loop# epoch {epoch} : accuracy {train_acc}")
+
+            
+            #train_stats.append(somestats)
         except (KeyboardInterrupt, SystemExit):
             print("Exiting...")
             raise
+    #return train_stats
+    return training_stats
 
-def eval(model, eval_loader=None, species_names=None):
+def eval(model, eval_loader=None, species_names=None, **kwargs):
     if eval_loader is None:
         raise TypeError("Callee is required to pass in valid instance of dataloader. This is fatal.")
-    if not isinstance(species_names, list):
-        raise TypeError("species_names must be a list of strings representing true labels.")
+    #if not isinstance(species_names, list):
+    #    raise TypeError("species_names must be a list of strings representing true labels.")
     with torch.no_grad():
         model.eval()
         
         total = 0
         correct = 0
-    
+        verbose = kwargs.get('verbose', False)
+
         labels_collection = {key:0 for key in range(10)}
         cm = ConfusionMatrix(labels=species_names)
 
@@ -247,55 +259,76 @@ def eval(model, eval_loader=None, species_names=None):
             cm.add_batch(predicted_labels=predicted_label.cpu().numpy() , target_labels=labels.cpu().numpy())
 
         accuracy = correct / total
-        print("Accuracy: %f" % (accuracy * 100.0))
         if verbose:
-            print("Eval loop had following instances:")
-            print(labels_collection)
-            print("Number of eval samples: %d" % total)
+            print("Accuracy: %f" % (accuracy * 100.0))
         
         return accuracy, cm
 
-# This is a stand in main() function... use this if you add support for modules later
-def run():
-
-    frogs_csv = Path("f:\Documents\Visual Studio 2017\Projects\Freebird2018-AANN\Freebird2018-AANN\Data\Frogs_MFCCs.csv")
+def run(n_folds=0, epochs=0, batch_size=1, **kwargs):
+    """ Runs ANN-classifier """
+    frogs_csv = Path.cwd() / 'Data' / 'Frogs_MFCCs.csv'
     #timer start
     timer_start = time.perf_counter()
+    run_kfolds = kwargs.get('run_kfolds', False)
+
+    loss_function = {
+        'crossentropy' : nn.CrossEntropyLoss(),
+        'nllr' : NLLRLoss
+        }.get(kwargs.pop('loss_function'))
+
     if run_kfolds:
         print("===========================")
-        print("Running %d-fold eval" % n_folds)
-
+        print(f"Running ANN-classifier against {n_folds}-fold cross evaluation")
+        if 'epochs' in kwargs:
+            epochs = kwargs.pop('epochs')
         stats = []
+        train_stats = []
         for ftrain, fevail, species_names in generate_kfolds_datasets(frogs_csv, kfolds=n_folds):
-        
-            model, optimizer = build_model_optimizer()
+            print('.', end='', flush=True)
+            model, optimizer = build_model_optimizer(**kwargs)
         
             train_loader = D.DataLoader(ftrain, batch_size, shuffle=True)
             eval_loader = D.DataLoader(fevail, batch_size, shuffle=True)
-        
-            train(model, optimizer, train_loader=train_loader)
+            
+            #specify eval_loader = eval_loader if you want eval stats after each epoch
+            train_loss_stats = train(model, optimizer, loss_function, train_loader=train_loader, epochs=epochs, eval_loader = eval_loader, **kwargs)
             acc_nfold, cm_nfold = eval(model, eval_loader=eval_loader, species_names=species_names)
             stats.append((acc_nfold, cm_nfold))
+            train_stats.append(train_loss_stats)
+        print("") #newline
         #get averaged accuracy
         n_acc = sum([a for a, _ in stats])/float(len(stats))
         std_deviation = ((sum([(a - n_acc) ** 2 for a, _ in stats]))/float(len(stats) - 1) ) ** 0.5
-        print("n-fold mean accuracy: %f +- %f" % (n_acc * 100.0, std_deviation * 100))
+
         cuml_cm = ConfusionMatrix(labels=species_names)
         for _, cm_nfold in stats:
             cuml_cm + cm_nfold
-        print("======= %d-fold cumulutive confusion matrix =======" % n_folds)
-        print(cuml_cm)
-        print("Training loop and eval for k-fold processing length: %f secs" % (time.perf_counter() - timer_start))
-        return n_acc, cuml_cm
+
+        run_time = time.perf_counter() - timer_start
+
+        if kwargs.get('verbose', False):
+            print("n-fold mean accuracy(std): %f (%f)" % (n_acc * 100.0, std_deviation * 100))
+            print(f"======= {n_folds}-fold cumulutive confusion matrix =======")
+            print(cuml_cm)
+            print(f"Training loop and eval for k-fold processing length: {run_time} secs")
+        #print(train_stats)
+        return {'Accuracy':n_acc, 
+                'ConfusionMatrix':cuml_cm, 
+                'EvaluationStats':[eval_acc for eval_acc, _ in stats],
+                'Runtime':run_time, 
+                'TrainingStats':train_stats,
+                'Labels':species_names
+               }
     else:
         print("== Training loop ==")
         model, optimizer = build_model_optimizer()
         train(model, optimizer)
         print("== Evaluating loop ==")
         acc_split, cm_split = eval(model)
-        print(cm_split)
-        print("Training loop and eval split processing length: %f secs" % (time.perf_counter() - timer_start))
-        return acc_split, cm_split
+        #print(cm_split)
+        run_time = time.perf_counter() - timer_start
+        print(f"Training loop and eval split processing length: {run_time} secs")
+        return {'Accuracy':acc_split, 'ConfusionMatrix':cm_split, 'Runtime':run_time}
 
 def save_model(to_file):
     """ Save model to file with eval statistics. """
@@ -307,6 +340,5 @@ def load_model(from_file):
 
     raise NotImplementedError
 
-
 if __name__ == "__main__":
-    run()
+    r = run(**hyperparams)

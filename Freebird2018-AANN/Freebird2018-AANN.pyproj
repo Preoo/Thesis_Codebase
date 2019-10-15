@@ -35,13 +35,22 @@
     <Compile Include="frogs_data.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="frogs_experiments.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="frogs_kNN.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="frogs_plotter.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="frogs_utils.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="gettingtoknow.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="frogs_hyperparams.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="python_speech_features\base.py" />
@@ -69,12 +78,14 @@
   <ItemGroup>
     <Folder Include="Checkpoints\" />
     <Folder Include="Data\" />
+    <Folder Include="Results\" />
     <Folder Include="Tests\" />
     <Folder Include="python_speech_features\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\Frogs_MFCCs.csv" />
     <Content Include="Tests\testcase.csv" />
+    <Content Include="Tests\test_results_for_plotter.json" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
