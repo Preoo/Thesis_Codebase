@@ -38,6 +38,9 @@
     <Compile Include="frogs_experiments.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="frogs_generate_classification_report.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="frogs_kNN.py">
       <SubType>Code</SubType>
     </Compile>
