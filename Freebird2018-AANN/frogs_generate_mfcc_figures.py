@@ -10,20 +10,15 @@ plt.style.use('seaborn-paper')
 # Good resources: 
 # https://haythamfayek.com/2016/04/21/speech-processing-for-machine-learning.html and http://wellesleynlp.github.io/spring16/speechAnalysis/index.html
 
-def waveplot(sample_rate, wave, maxf=None):
+def waveplot(sample_rate, wave):
     """Visualize (a segment of) a wave file. Adapted from resource[2]"""
     # maxf = maximum number of frames
     frames = scipy.arange(wave.size)   # x-axis
-    if maxf:
-        plt.plot(frames[:maxf], wave[:maxf])
-        plt.xticks(scipy.arange(0, maxf, 0.5*fs), scipy.arange(0, maxf/fs, 0.5))
-        plt.show()
-    else:
-        plt.plot(frames, wave)
-        #plt.xticks(scipy.arange(0, wave.size, 0.5*sample_rate), scipy.arange(0, wave.size/sample_rate, 0.5))
-        plt.xlabel('Näyte')
-        plt.ylabel('Amplitudi')
-        plt.show()
+
+    plt.plot(frames, wave)
+    plt.xlabel('Näyte')
+    plt.ylabel('Amplitudi')
+    plt.show()
 
 def windowplot(window, frame_size):
 
@@ -53,20 +48,14 @@ def spectrogram(sample_rate, wave, *args):
     plt.ylabel('Taajuus (Hz)')
     plt.show()
 
-    #plt.magnitude_spectrum(wave, Fs=sample_rate, pad_to=NFFT)
-    #plt.title('Magnitude_Spectrum')
-    #plt.xlabel('Taajuus (Hz)')
-    #plt.show()
-
 def filterbanks(sample_rate, nfilt, nfft, fft_bins_2_freq):
     
     fb = get_filterbanks(nfilt, nfft, sample_rate)
-    #.plot(fft_bins_2_freq, numpy.zeros_like(fft_bins_2_freq))
+    
     for filter in fb:
         plt.plot(fft_bins_2_freq, filter)
-    #plt.title('Filterbank')
+
     plt.ylabel('Skaalausarvo')
-    #plt.xticks(plt.xticks()[0], fft_bins_2_freq)
     plt.xlabel('Taajuus (Hz)')
     plt.show()
 
@@ -82,7 +71,6 @@ def mel_fbank(sample_rate, wave):
 def mel_spectrofram(sample_rate, wave, *args):
 
     mfccs = mfcc(wave, samplerate=sample_rate, winlen=frame_size, winstep=frame_stride, numcep=int(mel_filters/2), nfilt=mel_filters, nfft=NFFT, winfunc=window_func, appendEnergy=True, preemph=0, ceplifter=0) #Default: ceplifter=22 
-    mfccsT = mfccs.transpose()
     
     plt.stem(mfccs[0])
     plt.xlabel('MFC-kertoimet')
@@ -101,8 +89,8 @@ stop = 0.3
 pre_emphasis=0.97
 frame_size = 0.025
 frame_stride = 0.01
-NFFT = 512 # 512
-mel_filters = 44 # 44
+NFFT = 512
+mel_filters = 44
 window_func = numpy.hanning
 
 
@@ -125,11 +113,10 @@ if pre_emphasis > 0:
 
     wave = emphasized_signal
 
-print(sample_rate)
-print(len(fft_bins_2_freq))
+# Generate plots, requires user to save them.
 waveplot(sample_rate, wave)
 windowplot(window_func, frame_size*sample_rate)
-fftplot(sample_rate, wave, fft_bins_2_freq) #sets global fft_bins_2_freq for rest of graphs
+fftplot(sample_rate, wave, fft_bins_2_freq)
 spectrogram(sample_rate, wave, fft_bins_2_freq)
 filterbanks(sample_rate, mel_filters, NFFT, fft_bins_2_freq)
 mel_fbank(sample_rate, wave)
