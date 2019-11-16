@@ -41,6 +41,12 @@
     <Compile Include="frogs_generate_classification_report.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="frogs_generate_mfcc_figures.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="frogs_generate_sorted_graphs.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="frogs_kNN.py">
       <SubType>Code</SubType>
     </Compile>
