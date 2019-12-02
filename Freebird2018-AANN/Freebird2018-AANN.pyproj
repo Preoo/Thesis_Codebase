@@ -93,6 +93,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\Frogs_MFCCs.csv" />
+    <Content Include="requirements.txt" />
     <Content Include="Tests\testcase.csv" />
     <Content Include="Tests\test_results_for_plotter.json" />
   </ItemGroup>
