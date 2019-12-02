@@ -68,7 +68,7 @@ def mel_fbank(sample_rate, wave):
     plt.xlabel('Suodatin')
     plt.show()
 
-def mel_spectrofram(sample_rate, wave, *args):
+def mel_spectrogram(sample_rate, wave, *args):
 
     mfccs = mfcc(wave, samplerate=sample_rate, winlen=frame_size, winstep=frame_stride, numcep=int(mel_filters/2), nfilt=mel_filters, nfft=NFFT, winfunc=window_func, appendEnergy=True, preemph=0, ceplifter=0) #Default: ceplifter=22 
     
@@ -80,7 +80,7 @@ def mel_spectrofram(sample_rate, wave, *args):
     plt.xlabel('MFC-kertoimet')
     plt.xticks([x for x in range(0, int(mel_filters/2), 1)])
     plt.yticks([])
-    plt.ylabel('Kehykset')
+    plt.ylabel('Ikkunat')
     plt.show()
 
 #constants
@@ -120,4 +120,4 @@ fftplot(sample_rate, wave, fft_bins_2_freq)
 spectrogram(sample_rate, wave, fft_bins_2_freq)
 filterbanks(sample_rate, mel_filters, NFFT, fft_bins_2_freq)
 mel_fbank(sample_rate, wave)
-mel_spectrofram(sample_rate, wave)
+mel_spectrogram(sample_rate, wave)
